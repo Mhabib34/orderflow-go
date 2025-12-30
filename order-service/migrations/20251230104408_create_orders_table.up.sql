@@ -1,0 +1,6 @@
+CREATE TABLE orders (
+    id UUID PRIMARY KEY,
+    status VARCHAR(50) NOT NULL,
+    total_amount NUMERIC(12,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
