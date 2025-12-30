@@ -1,0 +1,237 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: API untuk mengelola notifications dalam sistem microservice
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8002/api/v1
+    description: Development server
+
+tags:
+  - name: Notifications
+    description: Operasi terkait notifications
+
+paths:
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Mendapatkan daftar notifications
+      description: Mengambil semua notifications dengan pagination
+      parameters:
+        - name: page
+          in: query
+          description: Nomor halaman
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Jumlah data per halaman
+          schema:
+            type: integer
+            default: 10
+        - name: type
+          in: query
+          description: Filter berdasarkan type
+          schema:
+            type: string
+            enum:
+              [order_created, order_updated, order_completed, order_cancelled]
+        - name: is_read
+          in: query
+          description: Filter berdasarkan status baca
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Daftar notifications berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationResponse"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+              example:
+                data:
+                  - id: "660e8400-e29b-41d4-a716-446655440001"
+                    order_id: "550e8400-e29b-41d4-a716-446655440000"
+                    type: "order_created"
+                    message: "Order baru telah dibuat dengan total Rp 150,000"
+                    is_read: false
+                    created_at: "2025-12-30T10:30:05Z"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 15
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /notifications/{notificationId}:
+    get:
+      tags:
+        - Notifications
+      summary: Mendapatkan detail notification
+      description: Mengambil informasi notification berdasarkan ID
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          description: ID notification
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Detail notification berhasil diambil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "404":
+          description: Notification tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      tags:
+        - Notifications
+      summary: Mark notification as read
+      description: Menandai notification sebagai sudah dibaca
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          description: ID notification
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notification berhasil ditandai sebagai dibaca
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "404":
+          description: Notification tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /notifications/mark-all-read:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all notifications as read
+      description: Menandai semua notification sebagai sudah dibaca
+      responses:
+        "200":
+          description: Semua notification berhasil ditandai sebagai dibaca
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "All notifications marked as read"
+                  updated_count:
+                    type: integer
+                    example: 5
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    NotificationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID notification
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        order_id:
+          type: string
+          format: uuid
+          description: ID order terkait
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        type:
+          type: string
+          enum: [order_created, order_updated, order_completed, order_cancelled]
+          description: Tipe notification
+          example: "order_created"
+        message:
+          type: string
+          description: Pesan notification
+          example: "Order baru telah dibuat dengan total Rp 150,000"
+        is_read:
+          type: boolean
+          description: Status baca notification
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Waktu notification dibuat
+          example: "2025-12-30T10:30:05Z"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Halaman saat ini
+          example: 1
+        limit:
+          type: integer
+          description: Jumlah data per halaman
+          example: 10
+        total:
+          type: integer
+          description: Total data
+          example: 15
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Pesan error
+          example: "Notification tidak ditemukan"
+        code:
+          type: string
+          description: Kode error
+          example: "NOT_FOUND"
