@@ -1,0 +1,269 @@
+openapi: 3.0.3
+info:
+  title: Order Service API
+  description: API untuk mengelola orders dalam sistem microservice
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8001/api/v1
+    description: Development server
+
+tags:
+  - name: Orders
+    description: Operasi terkait orders
+
+paths:
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Membuat order baru
+      description: Membuat order baru dan mengirim event ke message broker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+            example:
+              total_amount: 150000.00
+      responses:
+        "201":
+          description: Order berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                status: "pending"
+                total_amount: 150000.00
+                created_at: "2025-12-30T10:30:00Z"
+        "400":
+          description: Request tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      tags:
+        - Orders
+      summary: Mendapatkan daftar orders
+      description: Mengambil semua orders dengan pagination
+      parameters:
+        - name: page
+          in: query
+          description: Nomor halaman
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Jumlah data per halaman
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          description: Filter berdasarkan status
+          schema:
+            type: string
+            enum: [pending, processing, completed, cancelled]
+      responses:
+        "200":
+          description: Daftar orders berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrderResponse"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+              example:
+                data:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "pending"
+                    total_amount: 150000.00
+                    created_at: "2025-12-30T10:30:00Z"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 25
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Mendapatkan detail order
+      description: Mengambil informasi order berdasarkan ID
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID order
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Detail order berhasil diambil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "404":
+          description: Order tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      tags:
+        - Orders
+      summary: Update status order
+      description: Mengubah status order dan mengirim event ke message broker
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: ID order
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderRequest"
+            example:
+              status: "completed"
+      responses:
+        "200":
+          description: Status order berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          description: Request tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - total_amount
+      properties:
+        total_amount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Total amount order
+          example: 150000.00
+
+    UpdateOrderRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [pending, processing, completed, cancelled]
+          description: Status order
+          example: "completed"
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID order
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        status:
+          type: string
+          enum: [pending, processing, completed, cancelled]
+          description: Status order
+          example: "pending"
+        total_amount:
+          type: number
+          format: decimal
+          description: Total amount order
+          example: 150000.00
+        created_at:
+          type: string
+          format: date-time
+          description: Waktu order dibuat
+          example: "2025-12-30T10:30:00Z"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Halaman saat ini
+          example: 1
+        limit:
+          type: integer
+          description: Jumlah data per halaman
+          example: 10
+        total:
+          type: integer
+          description: Total data
+          example: 25
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Pesan error
+          example: "Order tidak ditemukan"
+        code:
+          type: string
+          description: Kode error
+          example: "NOT_FOUND"
