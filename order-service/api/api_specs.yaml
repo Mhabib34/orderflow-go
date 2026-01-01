@@ -29,6 +29,7 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateOrderRequest"
             example:
+              email: "QzZ0s@example.com"
               total_amount: 150000.00
       responses:
         "201":
@@ -38,22 +39,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/OrderResponse"
               example:
-                id: "550e8400-e29b-41d4-a716-446655440000"
-                status: "pending"
-                total_amount: 150000.00
-                created_at: "2025-12-30T10:30:00Z"
+                status: "OK"
+                message: "Order created successfully"
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  status: "pending"
+                  email: "QzZ0s@example.com"
+                  total_amount: 150000.00
+                  created_at: "2025-12-30T10:30:00Z"
+
         "400":
           description: Request tidak valid
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "BAD REQUEST"
+                code: 400
+                error: "Key: 'CreateOrderRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag"
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
     get:
       tags:
@@ -204,6 +218,11 @@ components:
           minimum: 0
           description: Total amount order
           example: 150000.00
+        email:
+          type: string
+          format: email
+          description: Email customer
+          example: "QzZ0s@example.com"
 
     UpdateOrderRequest:
       type: object
@@ -229,6 +248,11 @@ components:
           enum: [pending, processing, completed, cancelled]
           description: Status order
           example: "pending"
+        email:
+          type: string
+          format: email
+          description: Email customer
+          example: "QzZ0s@example.com"
         total_amount:
           type: number
           format: decimal
@@ -259,11 +283,9 @@ components:
     ErrorResponse:
       type: object
       properties:
+        code:
+          type: integer
+        status:
+          type: string
         error:
           type: string
-          description: Pesan error
-          example: "Order tidak ditemukan"
-        code:
-          type: string
-          description: Kode error
-          example: "NOT_FOUND"
