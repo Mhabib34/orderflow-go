@@ -5,6 +5,7 @@ import (
 	"order_service/internal/exception"
 	"order_service/internal/model"
 
+	"github.com/gofrs/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,4 +21,11 @@ func (o *OrderRepositoryImpl) CreateOrder(ctx context.Context, order *model.Orde
 	err := o.db.WithContext(ctx).Create(order).Error
 	exception.PanicIfError(err)
 	return order, nil
+}
+
+func (o *OrderRepositoryImpl) FindByID(ctx context.Context, id uuid.UUID)(*model.Orders, error) {
+	var order model.Orders
+	err := o.db.WithContext(ctx).Where("id = ?", id).First(&order).Error
+	exception.PanicIfError(err)
+	return &order, nil
 }

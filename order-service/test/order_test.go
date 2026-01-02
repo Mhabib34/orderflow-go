@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -67,12 +68,13 @@ func setupRouter(db *gorm.DB) http.Handler {
 	api := r.Group("/api/v1")
 	{
 		api.POST("/orders", controller.CreateOrder)
+		api.GET("/orders/:id", controller.FindByID)
 	}
 
 	return r
 }
 
-func truncateMissingPersons(db *gorm.DB) {
+func truncateOrders(db *gorm.DB) {
 	db.Exec("TRUNCATE TABLE orders")
 }
 
@@ -88,7 +90,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCreateOrderSuccess(t *testing.T) {
-	truncateMissingPersons(testDB)
+	truncateOrders(testDB)
 
 	// ===== multipart body =====
 	payload := map[string]any{
@@ -133,7 +135,7 @@ func TestCreateOrderSuccess(t *testing.T) {
 }
 
 func TestCreateOrderFailBadRequest(t *testing.T) {
-	truncateMissingPersons(testDB)
+	truncateOrders(testDB)
 
 	// ===== multipart body =====
 	payload := map[string]any{
@@ -163,4 +165,85 @@ func TestCreateOrderFailBadRequest(t *testing.T) {
 	json.Unmarshal(respBody, &response)
 
 	assert.Equal(t, "BAD REQUEST", response["status"])
+}
+
+func TestGetOrderByIdSuccess(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ⚠️ pastikan UUID ter-generate
+	assert.NotEqual(t, uuid.Nil, order.ID)
+
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders/"+order.ID.String(),
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].(map[string]any)
+
+	assert.Equal(t, order.ID.String(), data["id"])
+	assert.Equal(t, "QzZ0s@example.com", data["email"])
+	assert.Equal(t, "pending", data["status"])
+	assert.Equal(t, float64(100000), data["total_amount"])
+}
+
+func TestGetOrderByIdFailNotFound(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ⚠️ pastikan UUID ter-generate
+	assert.NotEqual(t, uuid.Nil, order.ID)
+
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders/ef62bded-d467-4968-b686-742e256bd0b5",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "NOT FOUND", response["status"])
 }

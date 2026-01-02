@@ -17,6 +17,7 @@ func SetupRouter(controller controller.OrderController) *gin.Engine {
 	api := r.Group("/api/v1")
 	{
 		api.POST("/orders", controller.CreateOrder)
+		api.GET("/orders/:id", controller.FindByID)
 	}
 
 	return r

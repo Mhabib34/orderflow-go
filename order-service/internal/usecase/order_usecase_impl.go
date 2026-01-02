@@ -11,6 +11,7 @@ import (
 	"order_service/internal/repository"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/gofrs/uuid"
 )
 
 type OrderUsecaseImpl struct {
@@ -41,6 +42,13 @@ func (service *OrderUsecaseImpl) CreateOrder(ctx context.Context, request dto.Cr
 	// publish
 	err = service.Publisher.Publish(ctx, "order.created", body)
 	exception.PanicIfError(err) 
+
+	return helper.ToOrderResponse(*order), nil
+}
+
+func (service *OrderUsecaseImpl) FindByID(ctx context.Context, id uuid.UUID) (dto.OrderResponse, error) {
+	order, err := service.OrderRepository.FindByID(ctx, id)
+	exception.PanicIfError(err)
 
 	return helper.ToOrderResponse(*order), nil
 }
