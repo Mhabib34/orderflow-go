@@ -52,3 +52,10 @@ func (service *OrderUsecaseImpl) FindByID(ctx context.Context, id uuid.UUID) (dt
 
 	return helper.ToOrderResponse(*order), nil
 }
+
+func (service *OrderUsecaseImpl) GetAll(ctx context.Context, status string, limit, page int) ([]model.Orders, int64, error) {
+	orders, total, err := service.OrderRepository.GetAll(ctx, status, limit, page)
+	exception.PanicIfError(err)
+
+	return orders, total, nil
+}

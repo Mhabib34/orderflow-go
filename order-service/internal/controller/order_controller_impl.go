@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"math"
 	"net/http"
 	"order_service/internal/dto"
 	"order_service/internal/exception"
@@ -61,6 +62,39 @@ func (controller *OrderControllerImpl) FindByID(ctx *gin.Context) {
 		Status: "OK",
 		Message: "Order found successfully", 
 		Data: result,
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}
+
+func (controller *OrderControllerImpl) GetAll(ctx *gin.Context) {
+	page := helper.StringToIntDefault(ctx.Query("page"), 1)
+	limit := helper.StringToIntDefault(ctx.Query("limit"), 10)
+	status := ctx.Query("status")
+
+	orders, total, err := controller.OrderUsecase.GetAll(
+		ctx.Request.Context(), 
+		status, 
+		limit, 
+		page,
+	)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	webResponse := dto.WebResponse{
+		Status: "OK",
+		Message: "Orders fetched successfully", 
+		Data: orders,
+		Pagination: &dto.Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
