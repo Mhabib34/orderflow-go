@@ -41,3 +41,27 @@ func (controller *OrderControllerImpl) CreateOrder(ctx *gin.Context) {
 
 	helper.WriteToResponseBody(ctx,http.StatusCreated,webResponse)
 }
+
+func (controller *OrderControllerImpl) FindByID(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+
+	id, err := helper.StringToUUID(idParam)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	result, err := controller.OrderUsecase.FindByID(ctx.Request.Context(), id)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	webResponse := dto.WebResponse{
+		Status: "OK",
+		Message: "Order found successfully", 
+		Data: result,
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}
