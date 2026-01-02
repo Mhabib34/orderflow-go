@@ -29,3 +29,42 @@ func (o *OrderRepositoryImpl) FindByID(ctx context.Context, id uuid.UUID)(*model
 	exception.PanicIfError(err)
 	return &order, nil
 }
+
+func (o *OrderRepositoryImpl) GetAll(
+	ctx context.Context,
+	status string,
+	limit, page int,
+) ([]model.Orders, int64, error) {
+
+	var (
+		orders []model.Orders
+		total  int64
+	)
+
+	offset := (page - 1) * limit
+
+	// base query
+	query := o.db.WithContext(ctx).
+		Model(&model.Orders{})
+
+	// ✅ filter hanya jika status dikirim
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	// count total
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// ambil data
+	if err := query.
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&orders).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return orders, total, nil
+}

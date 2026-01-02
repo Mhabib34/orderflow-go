@@ -69,6 +69,7 @@ func setupRouter(db *gorm.DB) http.Handler {
 	{
 		api.POST("/orders", controller.CreateOrder)
 		api.GET("/orders/:id", controller.FindByID)
+		api.GET("/orders", controller.GetAll)
 	}
 
 	return r
@@ -246,4 +247,160 @@ func TestGetOrderByIdFailNotFound(t *testing.T) {
 	_ = json.Unmarshal(respBody, &response)
 
 	assert.Equal(t, "NOT FOUND", response["status"])
+}
+
+func TestListMissingPersonSuccess(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 1)
+
+	// ambil item pertama
+	item := data[0].(map[string]any)
+
+	assert.Equal(t, order.ID.String(), item["id"])
+	assert.Equal(t, "QzZ0s@example.com", item["email"])
+	assert.Equal(t, "pending", item["status"])
+	assert.Equal(t, float64(100000), item["total_amount"])
+}
+
+func TestListMissingPersonSuccessWithPagination(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders?page=2",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 0)
+}
+
+func TestListMissingPersonSuccessWithQueryStatus(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders?status=success",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 0)
+}
+
+func TestListMissingPersonSuccessWithPageAndQuery(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/orders?page=1&status=pending",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 1)
 }

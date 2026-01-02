@@ -8,7 +8,7 @@ info:
     email: support@example.com
 
 servers:
-  - url: http://localhost:8001/api/v1
+  - url: http://localhost:3000/api/v1
     description: Development server
 
 tags:
@@ -101,6 +101,12 @@ paths:
               schema:
                 type: object
                 properties:
+                  status:
+                    type: string
+                    example: "OK"
+                  message:
+                    type: string
+                    example: "Orders found successfully"
                   data:
                     type: array
                     items:
@@ -108,8 +114,11 @@ paths:
                   pagination:
                     $ref: "#/components/schemas/Pagination"
               example:
+                status: "OK"
+                message: "Orders fetched successfully"
                 data:
                   - id: "550e8400-e29b-41d4-a716-446655440000"
+                    email: "QzZ0s@example.com"
                     status: "pending"
                     total_amount: 150000.00
                     created_at: "2025-12-30T10:30:00Z"
@@ -117,6 +126,7 @@ paths:
                   page: 1
                   limit: 10
                   total: 25
+                  total_pages: 3
         "500":
           description: Internal server error
           content:
@@ -312,6 +322,10 @@ components:
           type: integer
           description: Total data
           example: 25
+        total_pages:
+          type: integer
+          description: Total halaman
+          example: 3
 
     ErrorResponse:
       type: object
