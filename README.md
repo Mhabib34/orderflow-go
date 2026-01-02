@@ -9,18 +9,6 @@ Project sederhana untuk belajar microservice architecture dan message broker men
 - **Message Broker**: RabbitMQ untuk komunikasi antar service
 - **Database**: PostgreSQL untuk masing-masing service
 
-## 🏗️ Struktur Project
-
-```
-.
-├── order-service-api.yaml          # OpenAPI specs untuk Order Service
-├── notification-service-api.yaml   # OpenAPI specs untuk Notification Service
-├── database-schema.sql             # Database schema untuk kedua service
-├── docker-compose.yml              # Docker compose untuk infrastructure
-├── ARCHITECTURE.md                 # Dokumentasi arsitektur sistem
-└── README.md                       # File ini
-```
-
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
@@ -29,9 +17,9 @@ Pastikan sudah terinstall:
 
 - **PostgreSQL** (versi 12 atau lebih baru)
 - **RabbitMQ** (versi 3.8 atau lebih baru)
-- **Node.js** / **Go** / **Python** (sesuai pilihan bahasa)
+- **Go**
 - **Git**
-- **Postman/Insomnia** (untuk testing API)
+- **Postman** (untuk testing API)
 
 ### 2. Setup PostgreSQL
 
@@ -42,19 +30,19 @@ Pastikan sudah terinstall:
 
 # Setelah install, buat database untuk Order Service
 psql -U postgres
-CREATE DATABASE order_service_db;
+CREATE DATABASE order_service;
 \q
 
 # Buat database untuk Notification Service
 psql -U postgres
-CREATE DATABASE notification_service_db;
+CREATE DATABASE notification_service;
 \q
 
 # Import schema ke Order Service database
-psql -U postgres -d order_service_db -f database-schema.sql
+psql -U postgres -d order_service -f database-schema.sql
 
 # Import schema ke Notification Service database
-psql -U postgres -d notification_service_db -f database-schema.sql
+psql -U postgres -d notification_service -f database-schema.sql
 ```
 
 #### macOS
@@ -67,12 +55,12 @@ brew install postgresql@15
 brew services start postgresql@15
 
 # Buat databases
-createdb order_service_db
-createdb notification_service_db
+createdb order_service
+createdb notification_service
 
 # Import schema
-psql -d order_service_db -f database-schema.sql
-psql -d notification_service_db -f database-schema.sql
+psql -d order_service -f database-schema.sql
+psql -d notification_service -f database-schema.sql
 ```
 
 #### Linux (Ubuntu/Debian)
@@ -87,12 +75,12 @@ sudo systemctl start postgresql
 sudo systemctl enable postgresql
 
 # Buat databases
-sudo -u postgres createdb order_service_db
-sudo -u postgres createdb notification_service_db
+sudo -u postgres createdb order_service
+sudo -u postgres createdb notification_service
 
 # Import schema
-sudo -u postgres psql -d order_service_db -f database-schema.sql
-sudo -u postgres psql -d notification_service_db -f database-schema.sql
+sudo -u postgres psql -d order_service -f database-schema.sql
+sudo -u postgres psql -d notification_service -f database-schema.sql
 ```
 
 ### 3. Setup RabbitMQ
@@ -149,7 +137,7 @@ sudo rabbitmq-plugins enable rabbitmq_management
 # Cek PostgreSQL berjalan
 psql -U postgres -l
 
-# Seharusnya melihat order_service_db dan notification_service_db dalam list
+# Seharusnya melihat order_service dan notification_service dalam list
 ```
 
 **RabbitMQ:**
@@ -172,18 +160,18 @@ sudo rabbitmqctl status
 2. Login dengan username: `guest`, password: `guest`
 3. Pergi ke tab **Exchanges**
    - Click "Add a new exchange"
-   - Name: `order.events`
+   - Name: `order_exchanges`
    - Type: `topic`
    - Durability: `Durable`
    - Click "Add exchange"
 4. Pergi ke tab **Queues**
    - Click "Add a new queue"
-   - Name: `notification.queue`
+   - Name: `notification_queue`
    - Durability: `Durable`
    - Click "Add queue"
 5. Kembali ke tab **Exchanges**, click `order.events`
    - Scroll ke bawah ke bagian "Bindings"
-   - To queue: `notification.queue`
+   - To queue: `notification_queue`
    - Routing key: `order.*`
    - Click "Bind"
 
@@ -209,22 +197,20 @@ order-service/
 │   ├── routes/          # API routes
 │   ├── controllers/     # Business logic
 │   ├── models/          # Database models
-│   ├── services/        # Service layer
-│   └── producers/       # RabbitMQ producer
+│   ├── usecase/        # Use Case layer'
+│   ├── repository/      # Repository layer
+│   └── broker/          # RabbitMQ producer
 ├── .env
-├── package.json
-└── Dockerfile
 
 notification-service/
 ├── src/
 │   ├── routes/          # API routes
 │   ├── controllers/     # Business logic
 │   ├── models/          # Database models
-│   ├── services/        # Service layer
+│   ├── usecase/         # Use Case layer
+│   ├── repository/      # Repository layer
 │   └── consumers/       # RabbitMQ consumer
 ├── .env
-├── package.json
-└── Dockerfile
 ```
 
 ### Environment Variables
@@ -235,7 +221,7 @@ notification-service/
 PORT=8001
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=order_service_db
+DB_NAME=order_service
 DB_USER=postgres
 DB_PASSWORD=postgres
 
@@ -243,7 +229,7 @@ RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
-RABBITMQ_EXCHANGE=order.events
+RABBITMQ_EXCHANGE=order_exchanges
 ```
 
 **Notification Service (.env)**
@@ -252,7 +238,7 @@ RABBITMQ_EXCHANGE=order.events
 PORT=8002
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=notification_service_db
+DB_NAME=notification_service
 DB_USER=postgres
 DB_PASSWORD=postgres
 
@@ -260,7 +246,7 @@ RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
-RABBITMQ_QUEUE=notification.queue
+RABBITMQ_QUEUE=notification_)queue
 ```
 
 **Note:**
@@ -272,7 +258,7 @@ RABBITMQ_QUEUE=notification.queue
 
 ### Order Service API
 
-Base URL: `http://localhost:8001/api/v1`
+Base URL: `http://localhost:3000/api/v1`
 
 **Endpoints:**
 
@@ -301,7 +287,7 @@ Lihat detail lengkap di `notification-service-api.yaml`
 ### 1. Create Order
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/orders \
+curl -X POST http://localhost:3000/api/v1/orders \
   -H "Content-Type: application/json" \
   -d '{"total_amount": 150000.00}'
 ```
@@ -315,13 +301,13 @@ curl -X POST http://localhost:8001/api/v1/orders \
 ### 2. Check Notifications
 
 ```bash
-curl http://localhost:8002/api/v1/notifications
+curl http://localhost:3000/api/v1/notifications
 ```
 
 ### 3. Update Order Status
 
 ```bash
-curl -X PATCH http://localhost:8001/api/v1/orders/{orderId} \
+curl -X PATCH http://localhost:3000/api/v1/orders/{orderId} \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
@@ -335,7 +321,7 @@ curl -X PATCH http://localhost:8001/api/v1/orders/{orderId} \
 ### 4. Mark Notification as Read
 
 ```bash
-curl -X PATCH http://localhost:8002/api/v1/notifications/{notificationId}
+curl -X PATCH http://localhost:3000/api/v1/notifications/{notificationId}
 ```
 
 ## 📊 Monitoring
@@ -451,10 +437,10 @@ rabbitmq-plugins enable rabbitmq_management
 ```bash
 # Check process menggunakan port
 # Windows
-netstat -ano | findstr :8001
+netstat -ano | findstr :3000
 
 # macOS/Linux
-lsof -i :8001
+lsof -i :3000
 
 # Kill process jika perlu atau ganti PORT di .env
 ```
