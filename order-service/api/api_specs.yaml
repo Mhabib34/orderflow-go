@@ -123,6 +123,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
   /orders/{orderId}:
     get:
@@ -145,18 +149,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderResponse"
+              example:
+                status: "OK"
+                message: "Order found successfully"
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  status: "pending"
+                  email: "QzZ0s@example.com"
+                  total_amount: 150000.00
+                  created_at: "2025-12-30T10:30:00Z"
         "404":
           description: Order tidak ditemukan
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "NOT FOUND"
+                code: 404
+                error: "Order not found"
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
     patch:
       tags:
@@ -192,18 +213,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "BAD REQUEST"
+                code: 400
+                error: "Key: 'CreateOrderRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag"
         "404":
           description: Order tidak ditemukan
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "NOT FOUND"
+                code: 404
+                error: "Order not found"
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
 components:
   schemas:

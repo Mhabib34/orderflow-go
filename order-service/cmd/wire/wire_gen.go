@@ -28,8 +28,12 @@ func InitializeServer() (*App, error) {
 	}
 	orderRepository := repository.NewOrderRepository(db)
 	validate := NewValidator()
-	rabbitMQ := NewRabbitMQ()
-	orderUsecase := usecase.NewOrderUsecase(orderRepository, validate, rabbitMQ)
+	rabbitMQ, err := NewRabbitMQ()
+	if err != nil {
+		return nil, err
+	}
+	publisher := NewPublisher(rabbitMQ)
+	orderUsecase := usecase.NewOrderUsecase(orderRepository, validate, publisher)
 	orderController := controller.NewOrderController(orderUsecase)
 	engine := router.SetupRouter(orderController)
 	app := &App{
@@ -50,9 +54,18 @@ func NewValidator() *validator.Validate {
 	return validator.New()
 }
 
-func NewRabbitMQ() *broker.RabbitMQ {
+func NewRabbitMQ() (*broker.RabbitMQ, error) {
 	return broker.NewRabbitMQ("amqp://guest:guest@localhost:5672/")
 }
+
+func NewPublisher(rmq *broker.RabbitMQ) broker.Publisher {
+	return rmq
+}
+
+var brokerSet = wire.NewSet(
+	NewRabbitMQ,
+	NewPublisher,
+)
 
 var repositorySet = wire.NewSet(repository.NewOrderRepository)
 
