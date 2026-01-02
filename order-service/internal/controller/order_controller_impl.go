@@ -99,3 +99,34 @@ func (controller *OrderControllerImpl) GetAll(ctx *gin.Context) {
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
 }
+
+func(controller *OrderControllerImpl) UpdateStatus(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+
+	id, err := helper.StringToUUID(idParam)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	var request dto.UpdateStatusRequest
+
+	if err := ctx.ShouldBind(&request); err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	result, err := controller.OrderUsecase.UpdateStatus(ctx.Request.Context(), id, request)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	webResponse := dto.WebResponse{
+		Status: "OK",
+		Message: "Order updated successfully", 
+		Data: result,
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}

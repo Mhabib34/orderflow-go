@@ -12,4 +12,5 @@ type OrderUsecase interface {
 	CreateOrder(ctx context.Context, request dto.CreateOrderRequest) (dto.OrderResponse, error)
 	FindByID(ctx context.Context, id uuid.UUID) (dto.OrderResponse, error)
 	GetAll(ctx context.Context, status string, limit, page int) ([]model.Orders, int64, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, request dto.UpdateStatusRequest) (dto.OrderResponse, error)
 }

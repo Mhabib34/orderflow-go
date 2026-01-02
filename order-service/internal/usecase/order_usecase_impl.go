@@ -59,3 +59,18 @@ func (service *OrderUsecaseImpl) GetAll(ctx context.Context, status string, limi
 
 	return orders, total, nil
 }
+
+func (service *OrderUsecaseImpl) UpdateStatus(ctx context.Context, id uuid.UUID, request dto.UpdateStatusRequest) (dto.OrderResponse, error) {
+	err := service.Validate.Struct(request)
+	exception.PanicIfError(err)
+
+	order, err := service.OrderRepository.FindByID(ctx, id)
+	exception.PanicIfError(err)
+
+	order.Status = string(request.Status)
+
+	order, err = service.OrderRepository.UpdateStatus(ctx, id, order)
+	exception.PanicIfError(err)
+
+	return helper.ToOrderResponse(*order), nil
+}
