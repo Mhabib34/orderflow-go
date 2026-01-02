@@ -217,6 +217,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderResponse"
+              example:
+                status: "OK"
+                message: "Order status updated successfully"
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  status: "completed"
+                  email: "QzZ0s@example.com"
+                  total_amount: 150000.00
+                  created_at: "2025-12-30T10:30:00Z"
         "400":
           description: Request tidak valid
           content:

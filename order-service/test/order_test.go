@@ -70,6 +70,7 @@ func setupRouter(db *gorm.DB) http.Handler {
 		api.POST("/orders", controller.CreateOrder)
 		api.GET("/orders/:id", controller.FindByID)
 		api.GET("/orders", controller.GetAll)
+		api.PATCH("/orders/:id/status", controller.UpdateStatus)
 	}
 
 	return r
@@ -403,4 +404,163 @@ func TestListMissingPersonSuccessWithPageAndQuery(t *testing.T) {
 
 	data := response["data"].([]any)
 	assert.Len(t, data, 1)
+}
+
+func TestUpdateOrderStatusSuccess(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create order =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== request body =====
+	payload := map[string]any{
+		"status": "paid",
+	}
+
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/orders/"+order.ID.String()+"/status",
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].(map[string]any)
+
+	assert.Equal(t, order.ID.String(), data["id"])
+	assert.Equal(t, "paid", data["status"])
+
+	// ===== assert DB =====
+	var updated model.Orders
+	err = testDB.First(&updated, "id = ?", order.ID).Error
+	assert.Nil(t, err)
+	assert.Equal(t, "paid", updated.Status)
+}
+
+func TestUpdateOrderStatusFailInvalidStatus(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create order =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== invalid status =====
+	payload := map[string]any{
+		"status": "random",
+	}
+
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/orders/"+order.ID.String()+"/status",
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "BAD REQUEST", response["status"])
+}
+
+func TestUpdateOrderStatusFailNotFound(t *testing.T) {
+	truncateOrders(testDB)
+
+	payload := map[string]any{
+		"status": "paid",
+	}
+
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/orders/ef62bded-d467-4968-b686-742e256bd0b5/status",
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "NOT FOUND", response["status"])
+}
+
+func TestUpdateOrderStatusFailBadRequest(t *testing.T) {
+	truncateOrders(testDB)
+
+	// ===== create order =====
+	order := model.Orders{
+		Email:       "QzZ0s@example.com",
+		TotalAmount: 100000,
+	}
+	err := testDB.Create(&order).Error
+	assert.Nil(t, err)
+
+	// ===== invalid status =====
+	payload := map[string]any{
+		"status": "",
+	}
+
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/orders/"+order.ID.String()+"/status",
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "BAD REQUEST", response["status"])
 }

@@ -19,6 +19,7 @@ func SetupRouter(controller controller.OrderController) *gin.Engine {
 		api.POST("/orders", controller.CreateOrder)
 		api.GET("/orders/:id", controller.FindByID)
 		api.GET("/orders", controller.GetAll)
+		api.PATCH("/orders/:id/status", controller.UpdateStatus)
 	}
 
 	return r

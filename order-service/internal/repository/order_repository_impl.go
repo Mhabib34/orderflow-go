@@ -68,3 +68,11 @@ func (o *OrderRepositoryImpl) GetAll(
 
 	return orders, total, nil
 }
+
+
+func (o *OrderRepositoryImpl) UpdateStatus(ctx context.Context, id uuid.UUID, order *model.Orders)(*model.Orders, error) {
+	err := o.db.WithContext(ctx).Where("id = ?", id).Updates(order).Error
+	exception.PanicIfError(err)
+	
+	return order, nil
+}
