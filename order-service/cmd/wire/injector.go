@@ -26,9 +26,18 @@ func NewValidator() *validator.Validate {
 	return validator.New()
 }
 
-func NewRabbitMQ() *broker.RabbitMQ {
+func NewRabbitMQ() (*broker.RabbitMQ, error) {
 	return broker.NewRabbitMQ("amqp://guest:guest@localhost:5672/")
 }
+
+func NewPublisher(rmq *broker.RabbitMQ) broker.Publisher {
+	return rmq
+}
+
+var brokerSet = wire.NewSet(
+	NewRabbitMQ,
+	NewPublisher,
+)
 
 var repositorySet = wire.NewSet(
 	repository.NewOrderRepository,
@@ -48,22 +57,13 @@ var routerSet = wire.NewSet(
 
 func InitializeServer() (*App, error) {
 	wire.Build(
-		// Database
 		database.Connect,
-
-		// RabbitMQ
-		NewRabbitMQ,
-
-		// Validator
 		NewValidator,
-
-		// Layers
+		brokerSet,
 		repositorySet,
 		usecaseSet,
 		controllerSet,
 		routerSet,
-
-		// App
 		wire.Struct(new(App), "*"),
 	)
 	return nil, nil

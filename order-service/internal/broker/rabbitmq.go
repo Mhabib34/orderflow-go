@@ -13,15 +13,20 @@ type RabbitMQ struct {
 	Channel *amqp.Channel
 }
 
-func NewRabbitMQ(url string) *RabbitMQ {
+func NewRabbitMQ(url string) (*RabbitMQ, error) {
+	log.Println("🔵 [DEBUG] Attempting to connect to RabbitMQ...")
+	
 	conn, err := amqp.Dial(url)
 	if err != nil {
-		log.Fatal("failed connect rabbitmq:", err)
+		log.Printf("🔴 [ERROR] Failed to connect to RabbitMQ: %v\n", err)
+		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatal("failed open channel:", err)
+		conn.Close()
+		log.Printf("🔴 [ERROR] Failed to open channel: %v\n", err)
+		return nil, fmt.Errorf("failed to open channel: %w", err)
 	}
 
 	err = ch.ExchangeDeclare(
@@ -34,13 +39,18 @@ func NewRabbitMQ(url string) *RabbitMQ {
 		nil,
 	)
 	if err != nil {
-		log.Fatal("failed declare exchange:", err)
+		ch.Close()
+		conn.Close()
+		log.Printf("🔴 [ERROR] Failed to declare exchange: %v\n", err)
+		return nil, fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
+	log.Println("✅ [SUCCESS] RabbitMQ connected successfully")
+	
 	return &RabbitMQ{
 		Conn:    conn,
 		Channel: ch,
-	}
+	}, nil
 }
 
 func (r *RabbitMQ) Publish(ctx context.Context, routingKey string, body []byte) error {
@@ -60,8 +70,6 @@ func (r *RabbitMQ) Publish(ctx context.Context, routingKey string, body []byte) 
 		return err
 	}
 
-	// ✅ MESSAGE SUCCESS
 	fmt.Printf("📤 Message published | routing_key=%s\n", routingKey)
-
 	return nil
 }
