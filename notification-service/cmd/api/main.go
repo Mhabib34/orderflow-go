@@ -4,20 +4,46 @@ import (
 	"context"
 	"log"
 	"notification_service/internal/consumer"
+	"notification_service/internal/controller"
+	"notification_service/internal/database"
+	"notification_service/internal/repository"
+	"notification_service/internal/usecase"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Load .env hanya sekali di awal
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
+
 
 func main() {
 	rabbitURL := "amqp://guest:guest@localhost:5672/"
+	db, err := database.Connect()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	validate := validator.New()
+
+	repo := repository.NewNotificationRepository(db)
+	usecase := usecase.NewNotificationUsecase(repo, validate)
+	controller := controller.NewNotificationController(usecase)
 
 	consumer, err := consumer.NewConsumer(rabbitURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	
-	err = consumer.Start(context.Background(), 5)
+	err = consumer.Start(context.Background(), 5, controller.Create)
 	if err != nil {
 		log.Fatal(err)
 	} 

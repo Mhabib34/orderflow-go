@@ -79,6 +79,7 @@ func NewConsumer(url string) (*Consumer, error) {
 func (c *Consumer) Start(
 	ctx context.Context,
 	workerCount int,
+	controller func(context.Context, []byte) error,
 ) error {
 
 	err := c.channel.Qos(workerCount, 0, false)
@@ -105,6 +106,7 @@ func (c *Consumer) Start(
 	for i := 1; i <= workerCount; i++ {
 		w := worker.Worker{
 			ID:      i,
+			Controller: controller,
 		}
 		go w.Start(ctx, jobs)
 	}
