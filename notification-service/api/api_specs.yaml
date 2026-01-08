@@ -8,7 +8,7 @@ info:
     email: support@example.com
 
 servers:
-  - url: http://localhost:8002/api/v1
+  - url: http://localhost:8000/api/v1
     description: Development server
 
 tags:
@@ -62,6 +62,8 @@ paths:
                   pagination:
                     $ref: "#/components/schemas/Pagination"
               example:
+                status: "OK"
+                message: "Notifications fetched successfully"
                 data:
                   - id: "660e8400-e29b-41d4-a716-446655440001"
                     order_id: "550e8400-e29b-41d4-a716-446655440000"
@@ -73,12 +75,17 @@ paths:
                   page: 1
                   limit: 10
                   total: 15
+                  total_pages: 2
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
   /notifications/{notificationId}:
     get:
@@ -101,18 +108,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NotificationResponse"
+              example:
+                status: "OK"
+                message: "Get detail notification successfully"
+                data:
+                  id: "660e8400-e29b-41d4-a716-446655440001"
+                  order_id: "550e8400-e29b-41d4-a716-446655440000"
+                  type: "order_created"
+                  message: "Order baru telah dibuat dengan total Rp 150,000"
+                  is_read: false
+                  created_at: "2025-12-30T10:30:05Z"
         "404":
           description: Notification tidak ditemukan
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "NOT FOUND"
+                code: 404
+                error: "Notification not found"
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
     patch:
       tags:
@@ -134,18 +159,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NotificationResponse"
+              example:
+                status: "OK"
+                message: "Notification marked as read successfully"
         "404":
           description: Notification tidak ditemukan
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "NOT FOUND"
+                code: 404
+                error: "Notification not found"
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
   /notifications/mark-all-read:
     post:
@@ -173,6 +209,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: "INTERNAL_SERVER_ERROR"
+                code: 500
+                error: "Internal server error"
 
 components:
   schemas:
@@ -223,10 +263,18 @@ components:
           type: integer
           description: Total data
           example: 15
+        total_pages:
+          type: integer
+          description: Total halaman
+          example: 2
 
     ErrorResponse:
       type: object
       properties:
+        status:
+          type: string
+          description: Status error
+          example: "NOT FOUND"
         error:
           type: string
           description: Pesan error

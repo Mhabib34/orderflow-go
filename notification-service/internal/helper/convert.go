@@ -28,3 +28,16 @@ func StringToIntDefault(s string, defaultValue int) int {
 
 	return i
 }
+
+func StringToBoolDefault(s string, defaultValue bool) bool {
+	if s == "" {
+		return defaultValue
+	}
+
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return defaultValue
+	}
+
+	return b
+}
