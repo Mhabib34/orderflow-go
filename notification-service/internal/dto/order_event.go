@@ -26,6 +26,10 @@ type SearchNotificationRequest struct {
 	Page   int    `json:"page"`
 }
 
+type MarkNotificationAsReadRequest struct {
+	IsRead bool `validate:"required" json:"is_read"`
+}
+
 type NotificationResponse struct {
 	ID        uuid.UUID `json:"id"`
 	OrderID   uuid.UUID `json:"order_id"`

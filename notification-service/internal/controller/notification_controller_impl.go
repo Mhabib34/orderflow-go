@@ -131,3 +131,32 @@ func (controller *NotificationControllerImpl) FindByID(ctx *gin.Context) {
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
 }
+
+func (controller *NotificationControllerImpl) Update(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+
+	id, err := helper.StringToUUID(idParam)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	var request dto.MarkNotificationAsReadRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	err = controller.NotificationUsecase.Update(ctx.Request.Context(), id, request)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	webResponse := dto.WebResponse{
+		Status: "OK",
+		Message: "Notification marked as read successfully", 
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}

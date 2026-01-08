@@ -56,3 +56,16 @@ func (service *NotificationUsecaseImpl) FindByID(ctx context.Context, id uuid.UU
 
 	return helper.ToNotificationResponse(*notification), nil
 }
+
+func (service *NotificationUsecaseImpl) Update(ctx context.Context, id uuid.UUID, request dto.MarkNotificationAsReadRequest) error {
+	err := service.Validate.Struct(request)
+	exception.PanicIfError(err)
+
+	_, err = service.NotificationRepository.FindById(ctx, id)
+	exception.PanicIfError(err)
+	
+	err = service.NotificationRepository.Update(ctx, id, &model.Notifications{IsRead: request.IsRead})
+	exception.PanicIfError(err)
+
+	return nil
+}
