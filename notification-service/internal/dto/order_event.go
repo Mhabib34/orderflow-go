@@ -7,7 +7,7 @@ import (
 )
 
 type OrderCreatedEvent struct {
-	OrderID     string  `json:"OrderID"`      // PascalCase!
+	OrderID     uuid.UUID  `json:"OrderID"`      // PascalCase!
 	Email       string  `json:"Email"`        // PascalCase!
 	TotalAmount float64 `json:"TotalAmount"`  // PascalCase!
 }
@@ -17,6 +17,13 @@ type CreateNotificationRequest struct {
 	OrderID uuid.UUID `json:"order_id"`
 	Type    string    `json:"type"`
 	Message string    `json:"message"`
+}
+
+type SearchNotificationRequest struct {
+	IsRead *bool  `json:"is_read"`
+	Type   string `json:"type"`
+	Limit  int    `json:"limit"`
+	Page   int    `json:"page"`
 }
 
 type NotificationResponse struct {

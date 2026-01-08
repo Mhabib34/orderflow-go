@@ -35,3 +35,16 @@ func (service *NotificationUsecaseImpl) CreateNotification(ctx context.Context, 
 
 	return helper.ToNotificationResponse(*notification), nil
 }
+
+func (service *NotificationUsecaseImpl) GetAll(ctx context.Context, searchRequest dto.SearchNotificationRequest) ([]model.Notifications, int64, error) {
+	notifications, total, err := service.NotificationRepository.GetAll(
+		ctx, 
+		searchRequest.IsRead, 
+		searchRequest.Type, 
+		searchRequest.Limit, 
+		searchRequest.Page,
+	)
+	exception.PanicIfError(err)
+
+	return notifications, total, nil
+}

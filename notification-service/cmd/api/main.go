@@ -7,6 +7,7 @@ import (
 	"notification_service/internal/controller"
 	"notification_service/internal/database"
 	"notification_service/internal/repository"
+	"notification_service/internal/router"
 	"notification_service/internal/usecase"
 	"os"
 	"os/signal"
@@ -32,11 +33,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	
 	validate := validator.New()
-
+	
 	repo := repository.NewNotificationRepository(db)
 	usecase := usecase.NewNotificationUsecase(repo, validate)
 	controller := controller.NewNotificationController(usecase)
+	router := router.SetupRouter(controller)
 
 	consumer, err := consumer.NewConsumer(rabbitURL)
 	if err != nil {
@@ -49,6 +52,11 @@ func main() {
 	} 
 
 	log.Println("📥 Notification service started...")
+
+	err = router.Run(":8000")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// graceful shutdown
 	sig := make(chan os.Signal, 1)

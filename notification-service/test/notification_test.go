@@ -3,6 +3,9 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"notification_service/internal/controller"
 	"notification_service/internal/dto"
 	"notification_service/internal/model"
@@ -13,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -70,7 +73,7 @@ func TestProcessOrderCreatedMessageSuccess(t *testing.T) {
 	truncateNotifications(testDB)
 
 	// ===== simulate RabbitMQ message =====
-	orderID := uuid.New().String()
+	orderID := uuid.Must(uuid.NewV4())
 	message := dto.OrderCreatedEvent{
 		OrderID:     orderID,
 		Email:       "test@example.com",
@@ -92,7 +95,7 @@ func TestProcessOrderCreatedMessageSuccess(t *testing.T) {
 	err = testDB.First(&notification, "order_id = ?", orderID).Error
 	assert.Nil(t, err)
 
-	assert.Equal(t, orderID, notification.OrderID.String())
+	assert.Equal(t, orderID.String(), notification.OrderID.String())
 	assert.Equal(t, "order_created", notification.Type)
 	assert.Equal(t, "Your order has been created.", notification.Message)
 	assert.False(t, notification.IsRead)
@@ -122,7 +125,7 @@ func TestProcessOrderCreatedMessageWithEmptyOrderID(t *testing.T) {
 
 	// ===== message with empty OrderID =====
 	message := dto.OrderCreatedEvent{
-		OrderID:     "",
+		OrderID:     uuid.Nil,
 		Email:       "test@example.com",
 		TotalAmount: 250000,
 	}
@@ -149,17 +152,17 @@ func TestProcessOrderCreatedMessageWithInvalidUUID(t *testing.T) {
 
 	// ===== message with invalid UUID =====
 	message := dto.OrderCreatedEvent{
-		OrderID:     "not-a-valid-uuid",
+		OrderID:     uuid.Must(uuid.NewV4()),
 		Email:       "test@example.com",
 		TotalAmount: 250000,
 	}
 
-	messageBytes, err := json.Marshal(message)
+	_, err := json.Marshal(message)
 	assert.Nil(t, err)
 
 	// ===== process message =====
 	ctx := context.Background()
-	err = testController.Create(ctx, messageBytes)
+	err = testController.Create(ctx, []byte(`{"OrderID":"not-a-valid-uuid","Email":"test@example.com","TotalAmount":250000}`))
 
 	// ===== assert error =====
 	assert.NotNil(t, err)
@@ -176,17 +179,17 @@ func TestProcessMultipleOrderCreatedMessages(t *testing.T) {
 	// ===== create multiple messages =====
 	messages := []dto.OrderCreatedEvent{
 		{
-			OrderID:     uuid.New().String(),
+			OrderID:     uuid.Must(uuid.NewV4()),
 			Email:       "user1@example.com",
 			TotalAmount: 100000,
 		},
 		{
-			OrderID:     uuid.New().String(),
+			OrderID:     uuid.Must(uuid.NewV4()),
 			Email:       "user2@example.com",
 			TotalAmount: 200000,
 		},
 		{
-			OrderID:     uuid.New().String(),
+			OrderID:     uuid.Must(uuid.NewV4()),
 			Email:       "user3@example.com",
 			TotalAmount: 300000,
 		},
@@ -228,7 +231,7 @@ func TestProcessOrderCreatedMessageWithDifferentFormats(t *testing.T) {
 	}{
 		{
 			name:        "Valid PascalCase JSON",
-			message:     `{"OrderID":"` + uuid.New().String() + `","Email":"test@example.com","TotalAmount":100000}`,
+			message:     `{"OrderID":"` + uuid.Must(uuid.NewV4()).String() + `","Email":"test@example.com","TotalAmount":100000}`,
 			expectError: false,
 		},
 		{
@@ -239,12 +242,12 @@ func TestProcessOrderCreatedMessageWithDifferentFormats(t *testing.T) {
 		},
 		{
 			name:          "Missing Email field",
-			message:       `{"OrderID":"` + uuid.New().String() + `","TotalAmount":100000}`,
+			message:       `{"OrderID":"` + uuid.Must(uuid.NewV4()).String() + `","TotalAmount":100000}`,
 			expectError:   false, // Email tidak wajib di event
 		},
 		{
 			name:        "With zero TotalAmount",
-			message:     `{"OrderID":"` + uuid.New().String() + `","Email":"test@example.com","TotalAmount":0}`,
+			message:     `{"OrderID":"` + uuid.Must(uuid.NewV4()).String() + `","Email":"test@example.com","TotalAmount":0}`,
 			expectError: false,
 		},
 	}
@@ -275,7 +278,7 @@ func TestProcessOrderCreatedMessageConcurrently(t *testing.T) {
 
 	for i := 0; i < messageCount; i++ {
 		msg := dto.OrderCreatedEvent{
-			OrderID:     uuid.New().String(),
+			OrderID:     uuid.Must(uuid.NewV4()),
 			Email:       "concurrent@example.com",
 			TotalAmount: float64((i + 1) * 100000),
 		}
@@ -311,7 +314,7 @@ func TestProcessOrderCreatedMessageConcurrently(t *testing.T) {
 
 func TestOrderCreatedEventJSONMarshaling(t *testing.T) {
 	event := dto.OrderCreatedEvent{
-		OrderID:     uuid.New().String(),
+		OrderID:     uuid.Must(uuid.NewV4()),
 		Email:       "test@example.com",
 		TotalAmount: 500000,
 	}
@@ -351,4 +354,215 @@ func TestOrderCreatedEventWithRealRabbitMQFormat(t *testing.T) {
 
 	assert.Equal(t, "order_created", notification.Type)
 	assert.Equal(t, "Your order has been created.", notification.Message)
+}
+
+// ========== TEST HTTP ENDPOINTS ==========
+
+func TestGetAllNotificationsSuccess(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== create test data via GORM =====
+	notifications := []model.Notifications{
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  false,
+		},
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  true,
+		},
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  false,
+		},
+	}
+
+	for _, notif := range notifications {
+		err := testDB.Create(&notif).Error
+		assert.Nil(t, err)
+	}
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.GET("/api/v1/notifications", testController.GetAll)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 3)
+
+	// ===== verify first notification =====
+	item := data[0].(map[string]any)
+	assert.NotNil(t, item["id"])
+	assert.NotNil(t, item["order_id"])
+	assert.Equal(t, "order_created", item["type"])
+	assert.Equal(t, "Your order has been created.", item["message"])
+	assert.NotNil(t, item["is_read"])
+	assert.NotNil(t, item["created_at"])
+}
+
+func TestGetAllNotificationsEmpty(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.GET("/api/v1/notifications", testController.GetAll)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 0)
+}
+
+func TestGetAllNotificationsFilterByIsRead(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== create mixed read/unread notifications =====
+	notifications := []model.Notifications{
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  false,
+		},
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  false,
+		},
+		{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  true,
+		},
+	}
+
+	for _, notif := range notifications {
+		err := testDB.Create(&notif).Error
+		assert.Nil(t, err)
+	}
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.GET("/api/v1/notifications", testController.GetAll)
+
+	// ===== request GET with query parameter =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications?is_read=false",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 2)
+
+	// ===== verify all are unread =====
+	for _, d := range data {
+		item := d.(map[string]any)
+		assert.False(t, item["is_read"].(bool))
+	}
+}
+
+func TestGetAllNotificationsPagination(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== create multiple notifications =====
+	for i := 0; i < 15; i++ {
+		notif := model.Notifications{
+			OrderID: uuid.Must(uuid.NewV4()),
+			Type:    "order_created",
+			Message: "Your order has been created.",
+			IsRead:  false,
+		}
+		err := testDB.Create(&notif).Error
+		assert.Nil(t, err)
+	}
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.GET("/api/v1/notifications", testController.GetAll)
+
+	// ===== request with pagination =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications?page=1&limit=10",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 10)
 }

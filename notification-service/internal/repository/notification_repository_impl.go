@@ -21,3 +21,42 @@ func (n *NotificationRepositoryImpl) Create(ctx context.Context, notification *m
 	exception.PanicIfError(err)
 	return notification, nil
 }
+
+func (n *NotificationRepositoryImpl) GetAll(ctx context.Context, isRead *bool, Type string, limit, page int) ([]model.Notifications, int64, error) {
+	var (
+		notifications []model.Notifications
+		total         int64
+	)
+
+	offset := (page - 1) * limit
+
+	// base query
+	query := n.db.WithContext(ctx).
+		Model(&model.Notifications{})
+
+	// ✅ filter hanya jika type dikirim
+	if Type != "" {
+		query = query.Where("type = ?", Type)
+	}
+	
+	// ✅ filter hanya jika isRead tidak nil
+	if isRead != nil {
+		query = query.Where("is_read = ?", *isRead)
+	}
+
+	// count total
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// ambil data
+	if err := query.
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&notifications).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return notifications, total, nil
+}
