@@ -5,6 +5,7 @@ import (
 	"notification_service/internal/exception"
 	"notification_service/internal/model"
 
+	"github.com/gofrs/uuid"
 	"gorm.io/gorm"
 )
 
@@ -59,4 +60,11 @@ func (n *NotificationRepositoryImpl) GetAll(ctx context.Context, isRead *bool, T
 	}
 
 	return notifications, total, nil
+}
+
+func (n *NotificationRepositoryImpl) FindById(ctx context.Context, id uuid.UUID)(*model.Notifications, error) {
+	var notification model.Notifications
+	err := n.db.WithContext(ctx).Where("id = ?", id).First(&notification).Error
+	exception.PanicIfError(err)
+	return &notification, nil
 }
