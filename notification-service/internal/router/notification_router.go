@@ -17,6 +17,7 @@ func SetupRouter(controller controller.NotificationController) *gin.Engine {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/notifications", controller.GetAll)
+		api.GET("/notifications/:id", controller.FindByID)
 	}
 
 	return r

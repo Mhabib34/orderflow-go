@@ -9,4 +9,5 @@ import (
 type NotificationController interface {
 	Create(ctx context.Context, body []byte) error
 	GetAll(ctx *gin.Context)
+	FindByID(ctx *gin.Context)
 }

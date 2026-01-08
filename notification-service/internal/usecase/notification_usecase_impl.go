@@ -9,6 +9,7 @@ import (
 	"notification_service/internal/repository"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/gofrs/uuid"
 )
 
 type NotificationUsecaseImpl struct {
@@ -47,4 +48,11 @@ func (service *NotificationUsecaseImpl) GetAll(ctx context.Context, searchReques
 	exception.PanicIfError(err)
 
 	return notifications, total, nil
+}
+
+func (service *NotificationUsecaseImpl) FindByID(ctx context.Context, id uuid.UUID) (dto.NotificationResponse, error) {
+	notification, err := service.NotificationRepository.FindById(ctx, id)
+	exception.PanicIfError(err)
+
+	return helper.ToNotificationResponse(*notification), nil
 }

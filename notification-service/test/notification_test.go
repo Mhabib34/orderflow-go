@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"notification_service/internal/controller"
 	"notification_service/internal/dto"
+	"notification_service/internal/middleware"
 	"notification_service/internal/model"
 	"notification_service/internal/repository"
 	"notification_service/internal/usecase"
@@ -565,4 +566,106 @@ func TestGetAllNotificationsPagination(t *testing.T) {
 
 	data := response["data"].([]any)
 	assert.Len(t, data, 10)
+}
+
+func TestGetNotificationByIDSuccess(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== create test data =====
+	notif := model.Notifications{
+		OrderID: uuid.Must(uuid.NewV4()),
+		Type:    "order_created",
+		Message: "Your order has been created.",
+		IsRead:  false,
+	}
+
+	err := testDB.Create(&notif).Error
+	assert.Nil(t, err)
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.GET("/api/v1/notifications/:id", testController.FindByID)
+
+	// ===== request =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications/"+notif.ID.String(),
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].(map[string]any)
+
+	assert.Equal(t, notif.ID.String(), data["id"])
+	assert.Equal(t, notif.OrderID.String(), data["order_id"])
+	assert.Equal(t, "order_created", data["type"])
+	assert.Equal(t, "Your order has been created.", data["message"])
+	assert.Equal(t, false, data["is_read"])
+	assert.NotNil(t, data["created_at"])
+}
+
+func TestGetNotificationByIDNotFound(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.Use(middleware.ErrorRecovery())
+	router.GET("/api/v1/notifications/:id", testController.FindByID)
+
+	// ===== request with random UUID =====
+	randomID := uuid.Must(uuid.NewV4())
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications/"+randomID.String(),
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	// ===== assert =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "NOT FOUND", response["status"])
+	assert.NotNil(t, response["error"])
+}
+
+func TestGetNotificationByIDEmptyParam(t *testing.T) {
+	router := gin.Default()
+	router.Use(middleware.ErrorRecovery())
+	router.GET("/api/v1/notifications/:id", testController.FindByID)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/notifications/",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+
+	// Gin biasanya return 404 kalau route param kosong
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

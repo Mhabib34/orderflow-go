@@ -107,3 +107,27 @@ func (controller *NotificationControllerImpl) GetAll(ctx *gin.Context) {
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
 }
+
+func (controller *NotificationControllerImpl) FindByID(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+
+	id, err := helper.StringToUUID(idParam)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	notification, err := controller.NotificationUsecase.FindByID(ctx.Request.Context(), id)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	webResponse := dto.WebResponse{
+		Status: "OK",
+		Message: "Get detail notification successfully", 
+		Data: notification,
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}
