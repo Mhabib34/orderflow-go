@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -668,4 +669,123 @@ func TestGetNotificationByIDEmptyParam(t *testing.T) {
 
 	// Gin biasanya return 404 kalau route param kosong
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestUpdateNotificationIsReadSuccess(t *testing.T) {
+	truncateNotifications(testDB)
+
+	// ===== create test data =====
+	notif := model.Notifications{
+		OrderID: uuid.Must(uuid.NewV4()),
+		Type:    "order_created",
+		Message: "Your order has been created.",
+		IsRead:  false,
+	}
+
+	err := testDB.Create(&notif).Error
+	assert.Nil(t, err)
+
+	// ===== setup router =====
+	router := gin.Default()
+	router.Use(middleware.ErrorRecovery())
+	router.PATCH("/api/v1/notifications/:id", testController.Update)
+
+	// ===== request body =====
+	body := map[string]any{
+		"is_read": true,
+	}
+
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/notifications/"+notif.ID.String(),
+		bytes.NewBuffer(jsonBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	// ===== assert response =====
+	resp := rec.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+	assert.Equal(t, "Notification marked as read successfully", response["message"])
+
+	// ===== verify DB updated =====
+	var updated model.Notifications
+	err = testDB.First(&updated, "id = ?", notif.ID).Error
+	assert.Nil(t, err)
+	assert.True(t, updated.IsRead)
+}
+
+func TestUpdateNotificationIsReadInvalidBody(t *testing.T) {
+	truncateNotifications(testDB)
+
+	notif := model.Notifications{
+		OrderID: uuid.Must(uuid.NewV4()),
+		Type:    "order_created",
+		Message: "test",
+		IsRead:  false,
+	}
+
+	_ = testDB.Create(&notif).Error
+
+	router := gin.Default()
+	router.Use(middleware.ErrorRecovery())
+	router.PATCH("/api/v1/notifications/:id", testController.Update)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/notifications/"+notif.ID.String(),
+		bytes.NewBuffer([]byte(`{}`)),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	resp := rec.Result()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestUpdateNotificationIsReadNotFound(t *testing.T) {
+	truncateNotifications(testDB)
+
+	router := gin.Default()
+	router.Use(middleware.ErrorRecovery())
+	router.PATCH("/api/v1/notifications/:id", testController.Update)
+
+	body := map[string]any{
+		"is_read": true,
+	}
+
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/notifications/"+uuid.Must(uuid.NewV4()).String(),
+		bytes.NewBuffer(jsonBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	resp := rec.Result()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "NOT FOUND", response["status"])
 }

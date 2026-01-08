@@ -68,3 +68,9 @@ func (n *NotificationRepositoryImpl) FindById(ctx context.Context, id uuid.UUID)
 	exception.PanicIfError(err)
 	return &notification, nil
 }
+
+func (n *NotificationRepositoryImpl) Update(ctx context.Context,id uuid.UUID, notification *model.Notifications) error {
+	err := n.db.WithContext(ctx).Where("id = ?", id).Updates(notification).Error
+	exception.PanicIfError(err)
+	return nil
+}
