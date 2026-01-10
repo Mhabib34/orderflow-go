@@ -271,14 +271,13 @@ Lihat detail lengkap di `order-service-api.yaml`
 
 ### Notification Service API
 
-Base URL: `http://localhost:8002/api/v1`
+Base URL: `http://localhost:8000/api/v1`
 
 **Endpoints:**
 
 - `GET /notifications` - Mendapatkan daftar notifications
 - `GET /notifications/{notificationId}` - Mendapatkan detail notification
 - `PATCH /notifications/{notificationId}` - Mark notification as read
-- `POST /notifications/mark-all-read` - Mark all notifications as read
 
 Lihat detail lengkap di `notification-service-api.yaml`
 
