@@ -1,0 +1,3 @@
+ALTER TABLE payments 
+DROP COLUMN payment_id VARCHAR(255),
+DROP COLUMN payment_url VARCHAR(255);
