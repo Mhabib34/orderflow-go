@@ -18,8 +18,10 @@ import (
 )
 
 type App struct {
-	DB     *gorm.DB
-	Router *gin.Engine
+	DB       *gorm.DB
+	Router   *gin.Engine
+	Consumer *broker.RabbitMQ
+	Controller controller.OrderController
 }
 
 func NewValidator() *validator.Validate {

@@ -37,8 +37,10 @@ func InitializeServer() (*App, error) {
 	orderController := controller.NewOrderController(orderUsecase)
 	engine := router.SetupRouter(orderController)
 	app := &App{
-		DB:     db,
-		Router: engine,
+		DB:         db,
+		Router:     engine,
+		Consumer:   rabbitMQ,
+		Controller: orderController,
 	}
 	return app, nil
 }
@@ -46,8 +48,10 @@ func InitializeServer() (*App, error) {
 // injector.go:
 
 type App struct {
-	DB     *gorm.DB
-	Router *gin.Engine
+	DB         *gorm.DB
+	Router     *gin.Engine
+	Consumer   *broker.RabbitMQ
+	Controller controller.OrderController
 }
 
 func NewValidator() *validator.Validate {

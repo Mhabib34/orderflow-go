@@ -50,3 +50,17 @@ func (r *PaymentRepositoryImpl) UpdateStatusByPaymentID(
 	log.Printf("✅ Updated %d row(s) for payment_id: %s\n", result.RowsAffected, paymentID)
 	return nil
 }
+
+func (r *PaymentRepositoryImpl) FindByPaymentID(ctx context.Context, paymentID string) (*model.Payments, error) {
+	var payment model.Payments
+	
+	err := r.db.WithContext(ctx).
+		Where("payment_id = ?", paymentID).
+		First(&payment).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &payment, nil
+}
