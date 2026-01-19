@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"context"
+	"encoding/json"
+	"log"
 	"math"
 	"net/http"
 	"order_service/internal/dto"
@@ -129,4 +132,31 @@ func(controller *OrderControllerImpl) UpdateStatus(ctx *gin.Context) {
 	}
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}
+
+func (controller *OrderControllerImpl) HandlePaymentStatusUpdated(ctx context.Context, body []byte) error {
+	log.Printf("📦 Raw message: %s\n", string(body))
+
+	var event dto.PaymentStatusChangedEvent
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		log.Printf("❌ Failed to unmarshal JSON: %v\n", err)
+		return err
+	}
+
+	log.Println("📨 Payment Status Updated Event Received")
+	log.Printf("   OrderID: %s\n", event.OrderID)
+	log.Printf("   PaymentID: %s\n", event.PaymentID)
+	log.Printf("   Status: %s\n", event.PaymentStatus)
+	log.Printf("   Method: %s\n", event.PaymentMethod)
+
+	// Call usecase untuk update order status
+	err = controller.OrderUsecase.UpdateOrderStatus(ctx, event)
+	if err != nil {
+		log.Printf("❌ Failed to update order status: %v\n", err)
+		return err
+	}
+
+	log.Println("✅ Order status updated successfully")
+	return nil
 }

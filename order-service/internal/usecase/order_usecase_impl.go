@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"order_service/internal/broker"
 	"order_service/internal/dto"
 	"order_service/internal/exception"
@@ -73,4 +74,40 @@ func (service *OrderUsecaseImpl) UpdateStatus(ctx context.Context, id uuid.UUID,
 	exception.PanicIfError(err)
 
 	return helper.ToOrderResponse(*order), nil
+}
+func (u *OrderUsecaseImpl) UpdateOrderStatus(ctx context.Context, event dto.PaymentStatusChangedEvent) error {
+	// Map payment status ke order status
+	var orderStatus string
+	switch event.PaymentStatus {
+	case "SUCCESS":
+		orderStatus = "SUCCESS"
+	case "FAILED":
+		orderStatus = "CANCELLED"
+	case "EXPIRED":
+		orderStatus = "EXPIRED"
+	default:
+		orderStatus = "PENDING"
+	}
+
+	// ✅ Buat object Orders dengan semua field yang mau diupdate
+	orderUpdate := &model.Orders{
+		Status:        orderStatus,
+		PaymentID:     &event.PaymentID,      // Update payment_id
+		PaymentMethod: event.PaymentMethod, 
+		PaymentStatus: orderStatus,   // Update payment_status
+	}
+
+	// Update order di database
+	_, err := u.OrderRepository.UpdateStatus(ctx, event.OrderID, orderUpdate)
+	if err != nil {
+		log.Printf("❌ Failed to update order: %v\n", err)
+		return err
+	}
+
+	log.Printf("✅ Order %s updated:\n", event.OrderID)
+	log.Printf("   Status: %s\n", orderStatus)
+	log.Printf("   PaymentID: %s\n", event.PaymentID)
+	log.Printf("   PaymentMethod: %s\n", event.PaymentMethod)
+	
+	return nil
 }

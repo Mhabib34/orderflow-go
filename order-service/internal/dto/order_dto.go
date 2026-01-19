@@ -30,3 +30,10 @@ type OrderResponse struct {
 	TotalAmount float64   `json:"total_amount"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+type PaymentStatusChangedEvent struct {
+	PaymentStatus string `json:"payment_status"`
+	PaymentID     uuid.UUID `json:"payment_id"`
+	OrderID       uuid.UUID `json:"order_id"`
+	PaymentMethod string `json:"payment_method"`
+}

@@ -8,4 +8,5 @@ import (
 type PaymentRepository interface {
 	Create(ctx context.Context, payment *model.Payments) (*model.Payments, error)
 	UpdateStatusByPaymentID(ctx context.Context, paymentID string, status string) error
+	FindByPaymentID(ctx context.Context, paymentID string) (*model.Payments, error)
 }

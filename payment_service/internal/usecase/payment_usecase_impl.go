@@ -10,7 +10,6 @@ import (
 	"os"
 	"payment_service/internal/broker"
 	"payment_service/internal/dto"
-	"payment_service/internal/exception"
 	"payment_service/internal/model"
 	"payment_service/internal/repository"
 	"payment_service/internal/service"
@@ -109,7 +108,7 @@ func (p *PaymentUsecaseImpl) HandleMidtransCallback(
 ) error {
 
 	log.Printf("📩 Midtrans Callback Received\n")
-	log.Printf("   OrderID: %s\n", payload.OrderID)
+	log.Printf("   PaymentID (from Midtrans): %s\n", payload.OrderID)
 	log.Printf("   Status: %s\n", payload.TransactionStatus)
 	log.Printf("   StatusCode: %s\n", payload.StatusCode)
 	log.Printf("   GrossAmount: %s\n", payload.GrossAmount)
@@ -137,30 +136,49 @@ func (p *PaymentUsecaseImpl) HandleMidtransCallback(
 
 	log.Println("✅ Signature valid")
 
+	// ✅ 1. Ambil data payment dari database untuk mendapatkan order_id asli
+	payment, err := p.PaymentRepository.FindByPaymentID(ctx, payload.OrderID)
+	if err != nil {
+		log.Printf("❌ Payment not found: %v\n", err)
+		return fmt.Errorf("payment not found: %w", err)
+	}
+
+	log.Printf("✅ Payment found - OrderID: %s\n", payment.OrderID)
+
 	status := mapMidtransStatus(payload.TransactionStatus)
 	log.Printf("🔄 Mapping '%s' to '%s'\n", payload.TransactionStatus, status)
 
 	log.Printf("💾 Updating payment_id: %s to status: %s\n", payload.OrderID, status)
 	
-	err := p.PaymentRepository.UpdateStatusByPaymentID(ctx, payload.OrderID, status)
+	// ✅ 2. Update status payment
+	err = p.PaymentRepository.UpdateStatusByPaymentID(ctx, payload.OrderID, status)
 	if err != nil {
 		log.Printf("❌ Failed to update: %v\n", err)
 		return err
 	}
 
-	//publish to rabbitmq
+	// ✅ 3. Publish ke RabbitMQ dengan order_id yang benar
 	event := dto.PaymentStatusChangedEvent{
 		PaymentStatus: status,
-		PaymentID:     uuid.MustParse(payload.OrderID),
-		OrderID:       uuid.MustParse(payload.OrderID),
+		PaymentID:     uuid.MustParse(payload.OrderID),      // payment_id dari Midtrans
+		OrderID:       payment.OrderID,                       // ✅ order_id asli dari database
 		PaymentMethod: payload.PaymentType,
 	}
+	
 	body, err := json.Marshal(event)
-	exception.PanicIfError(err)
+	if err != nil {
+		log.Printf("❌ Failed to marshal event: %v\n", err)
+		return err
+	}
 	
 	err = p.Publisher.Publish(ctx, "payment.status.updated", body)
-	exception.PanicIfError(err) 
+	if err != nil {
+		log.Printf("❌ Failed to publish event: %v\n", err)
+		return err
+	}
 
 	log.Printf("✅ Payment %s updated successfully to %s\n", payload.OrderID, status)
+	log.Printf("📤 Event published - OrderID: %s, PaymentID: %s\n", payment.OrderID, payload.OrderID)
+	
 	return nil
 }
