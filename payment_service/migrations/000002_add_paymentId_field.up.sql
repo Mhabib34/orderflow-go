@@ -1,0 +1,3 @@
+ALTER TABLE payments 
+ADD COLUMN payment_id VARCHAR(255),
+ADD COLUMN payment_url VARCHAR(255);

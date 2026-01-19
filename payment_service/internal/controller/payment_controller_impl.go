@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"payment_service/internal/dto"
+	"payment_service/internal/usecase"
 
-	"github.com/gofrs/uuid"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type PaymentControllerImpl struct {
-	// PaymentUsecase usecase.PaymentUsecase
+	PaymentUsecase usecase.PaymentUsecase
 }
 
-func NewPaymentController() PaymentController {
-	return &PaymentControllerImpl{}
+func NewPaymentController(PaymentUsecase usecase.PaymentUsecase) PaymentController {
+	return &PaymentControllerImpl{
+		PaymentUsecase: PaymentUsecase,
+	}
 }
 
 func (controller *PaymentControllerImpl) Create(ctx context.Context, body []byte) error {
@@ -42,17 +47,55 @@ func (controller *PaymentControllerImpl) Create(ctx context.Context, body []byte
 	}
 
 	// // Call usecase
-	// _, err = controller.NotificationUsecase.CreateNotification(ctx, dto.CreateNotificationRequest{
-	// 	OrderID: event.OrderID,
-	// 	Type:    "order_created",
-	// 	Message: "Your order has been created.",
-	// })
+	_, err = controller.PaymentUsecase.CreatePayment(ctx, dto.CreatePaymentRequest{
+		OrderID: event.OrderID,
+		Amount:  int64(event.TotalAmount),
+		Method:  "bank_transfer",
+	})
 
-	// if err != nil {
-	// 	log.Printf("❌ Failed to create notification: %v\n", err)
-	// 	return err
-	// }
+	if err != nil {
+		log.Printf("❌ Failed to create payment: %v\n", err)
+		return err
+	}
 
 	log.Println("✅ Payment created successfully")
 	return nil
+}
+
+func (c *PaymentControllerImpl) HandleMidtransWebhook(ctx *gin.Context) {
+	// ✅ Tambahkan defer recover untuk catch panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("🚨 PANIC in webhook handler: %v\n", r)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+	}()
+
+	bodyBytes, err := ctx.GetRawData()
+	if err != nil {
+		log.Println("❌ Failed to read request body:", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "cannot read body"})
+		return
+	}
+	
+	log.Printf("📦 Webhook Raw Body: %s\n", string(bodyBytes))
+
+	var payload dto.MidtransCallback
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		log.Println("❌ Invalid webhook payload:", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+
+	log.Printf("📩 Webhook Parsed: %+v\n", payload)
+
+	// ✅ Pastikan usecase dipanggil
+	if err := c.PaymentUsecase.HandleMidtransCallback(ctx, payload); err != nil {
+		log.Printf("❌ Callback processing error: %v\n", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Println("✅ Webhook processed successfully")
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

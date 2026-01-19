@@ -1,20 +1,21 @@
-package consumer
+package broker
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"payment_service/internal/worker"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Consumer struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
-	queue   string
+type RabbitMQ struct {
+	Conn    *amqp.Connection
+	Channel *amqp.Channel
+	Queue   string
 }
 
-func NewConsumer(url string) (*Consumer, error) {
+func NewConsumer(url string) (*RabbitMQ, error) {
 	log.Println("🔌 Connecting to RabbitMQ...")
 
 	conn, err := amqp.Dial(url)
@@ -30,6 +31,19 @@ func NewConsumer(url string) (*Consumer, error) {
 	// Exchange
 	err = ch.ExchangeDeclare(
 		"order_exchanges",
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.ExchangeDeclare(
+		"payment_exchanges",
 		"topic",
 		true,
 		false,
@@ -68,26 +82,26 @@ func NewConsumer(url string) (*Consumer, error) {
 
 	log.Println("✅ RabbitMQ consumer ready")
 
-	return &Consumer{
-		conn:    conn,
-		channel: ch,
-		queue:   q.Name,
+	return &RabbitMQ{
+		Conn:    conn,
+		Channel: ch,
+		Queue:   q.Name,
 	}, nil
 }
 
-func (c *Consumer) Start(
+func (c *RabbitMQ) Start(
 	ctx context.Context,
 	workerCount int,
 	controller func(context.Context, []byte) error,
-) error {
+	) error {
 
-	err := c.channel.Qos(workerCount, 0, false)
+	err := c.Channel.Qos(workerCount, 0, false)
 	if err != nil {
 		return err
 	}
 
-	msgs, err := c.channel.Consume(
-		c.queue,
+	msgs, err := c.Channel.Consume(
+		c.Queue,
 		"",
 		false,
 		false,
@@ -119,5 +133,26 @@ func (c *Consumer) Start(
 
 	log.Printf("🚀 Consumer running with %d workers\n", workerCount)
 
+	return nil
+}
+
+func (r *RabbitMQ) Publish(ctx context.Context, routingKey string, body []byte) error {
+	err := r.Channel.PublishWithContext(
+		ctx,
+		"payment_exchanges",
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("📤 Message published | routing_key=%s\n", routingKey)
 	return nil
 }
