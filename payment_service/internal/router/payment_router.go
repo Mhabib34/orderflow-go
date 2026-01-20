@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(controller controller.PaymentControllerImpl) *gin.Engine {
+func SetupRouter(controller controller.PaymentController) *gin.Engine {
 	r := gin.New()
 
 	// middleware

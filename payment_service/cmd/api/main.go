@@ -6,18 +6,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	consumer "payment_service/internal/broker"
+	"payment_service/cmd/wire"
 	"payment_service/internal/config"
-	"payment_service/internal/controller"
-	"payment_service/internal/database"
-	"payment_service/internal/repository"
-	"payment_service/internal/router"
-	"payment_service/internal/service"
-	"payment_service/internal/usecase"
 	"syscall"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
 
@@ -29,85 +22,65 @@ func init() {
 }
 
 func main() {
+	// Load midtrans config
+	config.InitMidtrans()
+
+	// Context untuk graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
-	// 1. Database
-	db, err := database.Connect()
+
+	// Initialize dependencies dengan Wire
+	app, err := wire.InitializeServer()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("❌ Failed to initialize server: %v", err)
 	}
 
-	// 2. RabbitMQ - Inisialisasi LEBIH AWAL
-	rabbitURL := "amqp://guest:guest@localhost:5672/"
-	rabbitConsumer, err := consumer.NewConsumer(rabbitURL)
+	// Start RabbitMQ Consumer untuk payment.status.updated
+	err = app.Consumer.Start(ctx, 5, app.Controller.Create)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("❌ Failed to start RabbitMQ consumer: %v", err)
 	}
+	log.Println("✅ RabbitMQ consumer started")
 
-	// 3. Dependencies
-	validator := validator.New()
-	config.InitMidtrans()
-	
-	midtransService := service.NewMidtransService()
-	repo := repository.NewPaymentRepository(db)
-	
-	// ✅ FIX: Pass rabbitConsumer sebagai Publisher
-	paymentUsecase := usecase.NewPaymentUsecase(
-		repo, 
-		validator, 
-		midtransService,
-		rabbitConsumer, // ✅ Inject Publisher di sini
-	)
-	
-	paymentController := controller.NewPaymentController(paymentUsecase)
-	
-	// 4. Router
-	r := router.SetupRouter(*paymentController.(*controller.PaymentControllerImpl))
-	
-	// 5. Start RabbitMQ Consumer
-	err = rabbitConsumer.Start(ctx, 5, paymentController.Create)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 6. HTTP Server dengan context
+	// HTTP Server
 	srv := &http.Server{
 		Addr:    ":8080",
-		Handler: r,
+		Handler: app.Router,
 	}
 
-	// 7. Start server di goroutine
+	// Start HTTP server di goroutine
 	go func() {
-		log.Println("✅ Payment Service is running on :8080")
+		log.Println("✅ PaymentService is running on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("❌ Server error: %v\n", err)
+			log.Fatalf("❌ Server error: %v", err)
 		}
 	}()
 
-	// 8. Wait for interrupt signal (Ctrl+C)
+	// Wait for interrupt signal (Ctrl+C)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	
+
 	log.Println("🛑 Shutdown signal received, stopping server...")
 	cancel() // Cancel context untuk stop RabbitMQ consumer
 
-	// 9. Graceful shutdown HTTP server dengan timeout
+	// Graceful shutdown HTTP server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("❌ Server forced to shutdown: %v\n", err)
+		log.Printf("❌ Server forced to shutdown: %v", err)
 	}
 
-	// 10. Close RabbitMQ connections
-	if rabbitConsumer.Channel != nil {
-		rabbitConsumer.Channel.Close()
+	// Close RabbitMQ connections
+	if app.Consumer.Channel != nil {
+		app.Consumer.Channel.Close()
+		log.Println("✅ RabbitMQ channel closed")
 	}
-	if rabbitConsumer.Conn != nil {
-		rabbitConsumer.Conn.Close()
+	if app.Consumer.Conn != nil {
+		app.Consumer.Conn.Close()
+		log.Println("✅ RabbitMQ connection closed")
 	}
 
-	log.Println("👋 Payment Service stopped gracefully")
+	log.Println("👋 PaymentService stopped gracefully")
 }
