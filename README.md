@@ -38,11 +38,19 @@ psql -U postgres
 CREATE DATABASE notification_service;
 \q
 
+# Buat database untuk Payment Service
+psql -U postgres
+CREATE DATABASE payment_service;
+\q
+
 # Import schema ke Order Service database
 psql -U postgres -d order_service -f database-schema.sql
 
 # Import schema ke Notification Service database
 psql -U postgres -d notification_service -f database-schema.sql
+
+# Import schema ke Notification Service database
+psql -U postgres -d payment_service -f database-schema.sql
 ```
 
 #### macOS
@@ -57,10 +65,13 @@ brew services start postgresql@15
 # Buat databases
 createdb order_service
 createdb notification_service
+createdb payment_service
+
 
 # Import schema
 psql -d order_service -f database-schema.sql
 psql -d notification_service -f database-schema.sql
+psql -d payment_service -f database-schema.sql
 ```
 
 #### Linux (Ubuntu/Debian)
@@ -77,10 +88,12 @@ sudo systemctl enable postgresql
 # Buat databases
 sudo -u postgres createdb order_service
 sudo -u postgres createdb notification_service
+sudo -u postgres createdb payment_service
 
 # Import schema
 sudo -u postgres psql -d order_service -f database-schema.sql
 sudo -u postgres psql -d notification_service -f database-schema.sql
+sudo -u postgres psql -d payment_service -f database-schema.sql
 ```
 
 ### 3. Setup RabbitMQ
@@ -193,7 +206,7 @@ rabbitmqadmin declare binding source=order.events destination=notification.queue
 
 ```
 order-service/
-├── src/
+├── internal/
 │   ├── routes/          # API routes
 │   ├── controllers/     # Business logic
 │   ├── models/          # Database models
@@ -203,13 +216,23 @@ order-service/
 ├── .env
 
 notification-service/
-├── src/
+├── internal/
 │   ├── routes/          # API routes
 │   ├── controllers/     # Business logic
 │   ├── models/          # Database models
 │   ├── usecase/         # Use Case layer
 │   ├── repository/      # Repository layer
 │   └── consumers/       # RabbitMQ consumer
+├── .env
+
+payment-service/
+├── internal/
+│   ├── routes/          # API routes
+│   ├── controllers/     # Business logic
+│   ├── models/          # Database models
+│   ├── usecase/         # Use Case layer
+│   ├── repository/      # Repository layer
+│   └── broker/          # RabbitMQ consumer
 ├── .env
 ```
 
@@ -229,6 +252,7 @@ RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
+RABBITMQ_QUEUE=order.payment.status.updated
 RABBITMQ_EXCHANGE=order_exchanges
 ```
 
@@ -246,7 +270,25 @@ RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
-RABBITMQ_QUEUE=notification_)queue
+RABBITMQ_QUEUE=notification.order.created
+```
+
+**Payment Service (.env)**
+
+```env
+PORT=8002
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=payment_service
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_QUEUE=payment.order.created
+RABBITMQ_EXCHANGE=payment_exchanges
 ```
 
 **Note:**
@@ -463,20 +505,17 @@ lsof -i :3000
 Dari project ini kamu akan belajar:
 
 1. ✅ **Microservice Architecture**
-
    - Service independence
    - Database per service pattern
    - API design
 
 2. ✅ **Message Broker**
-
    - Asynchronous communication
    - Event-driven architecture
    - Publisher/Subscriber pattern
    - RabbitMQ setup dan configuration
 
 3. ✅ **Database Design**
-
    - Schema design
    - Indexing
    - Triggers
@@ -492,31 +531,26 @@ Dari project ini kamu akan belajar:
 Setelah basic implementation, kamu bisa tambahkan:
 
 1. **Containerization (Recommended next step!)**
-
    - Dockerize Order Service
    - Dockerize Notification Service
    - Docker Compose orchestration
    - Multi-stage builds
 
 2. **Error Handling & Retry**
-
    - Dead letter queue
    - Retry mechanism
    - Circuit breaker
 
 3. **Authentication & Authorization**
-
    - JWT tokens
    - API Gateway
 
 4. **Logging & Monitoring**
-
    - Centralized logging (ELK stack)
    - Metrics (Prometheus + Grafana)
    - Distributed tracing (Jaeger)
 
 5. **Additional Services**
-
    - Payment Service
    - Email Service
    - User Service
