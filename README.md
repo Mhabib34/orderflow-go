@@ -1,77 +1,125 @@
-# Microservice Learning Project
+# OrderFlow-Go - Microservices Learning Project
 
-Project sederhana untuk belajar microservice architecture dan message broker menggunakan Order Service dan Notification Service.
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-316192?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8+-FF6600?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
+
+Project sederhana untuk belajar **microservice architecture** dan **message broker** menggunakan Go, PostgreSQL, dan RabbitMQ. Project ini mengimplementasikan Order Management System dengan event-driven architecture.
+
+## 📚 Table of Contents
+
+- [Arsitektur](#-arsitektur)
+- [Komponen](#-komponen)
+- [Prerequisites](#-prerequisites)
+- [Quick Start](#-quick-start)
+- [Service Details](#-service-details)
+- [API Documentation](#-api-documentation)
+- [Development](#-development)
+- [Testing](#-testing)
+- [Monitoring](#-monitoring)
+- [Troubleshooting](#-troubleshooting)
+- [Learning Objectives](#-learning-objectives)
+- [Next Steps](#-next-steps)
+
+## 🏗 Arsitektur
+
+```
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│  Order Service  │         │ Payment Service │         │Notification Svc │
+│    (Port 3000)  │         │   (Port 8000)   │         │   (Port 8080)   │
+└────────┬────────┘         └────────┬────────┘         └────────┬────────┘
+         │                           │                           │
+         │  Publish Events           │  Publish Events           │  Consume
+         │  ┌────────────────────────┼───────────────────────────┘  Events
+         │  │                        │
+         ▼  ▼                        ▼
+    ┌────────────────────────────────────┐
+    │         RabbitMQ Broker            │
+    │                                    │
+    │  Exchanges: order_exchanges        │
+    │             payment_exchanges      │
+    │                                    │
+    │  Queues: notification.order.created│
+    │         payment.order.created      │
+    │         order.payment.status.updated│
+    └────────────────────────────────────┘
+         │           │           │
+         ▼           ▼           ▼
+    ┌─────────┐ ┌─────────┐ ┌─────────┐
+    │PostgreSQL│ │PostgreSQL│ │PostgreSQL│
+    │ order_  │ │ payment_│ │notification_│
+    │ service │ │ service │ │  service   │
+    └─────────┘ └─────────┘ └─────────┘
+```
+
+Lihat detail arsitektur di [Architecture.md](Architecture.md)
 
 ## 📋 Komponen
 
-- **Order Service**: Service untuk mengelola orders
-- **Notification Service**: Service untuk mengelola notifications
-- **Message Broker**: RabbitMQ untuk komunikasi antar service
-- **Database**: PostgreSQL untuk masing-masing service
+| Service | Port | Database | Fungsi |
+|---------|------|----------|--------|
+| **Order Service** | 8001 | `order_service` | Mengelola pembuatan dan pembaruan order |
+| **Payment Service** | 8003 | `payment_service` | Mengelola proses pembayaran |
+| **Notification Service** | 8002 | `notification_service` | Mengelola notifikasi kepada user |
+| **RabbitMQ** | 5672, 15672 | - | Message broker untuk komunikasi async |
+| **PostgreSQL** | 5432 | Multiple DBs | Database untuk setiap service |
 
-## 🚀 Quick Start
-
-### 1. Prerequisites
+## 🔧 Prerequisites
 
 Pastikan sudah terinstall:
 
-- **PostgreSQL** (versi 12 atau lebih baru)
-- **RabbitMQ** (versi 3.8 atau lebih baru)
-- **Go**
-- **Git**
-- **Postman** (untuk testing API)
+- **Go** v1.21 atau lebih baru - [Download](https://go.dev/dl/)
+- **PostgreSQL** v15 atau lebih baru - [Download](https://www.postgresql.org/download/)
+- **RabbitMQ** v3.8 atau lebih baru - [Download](https://www.rabbitmq.com/download.html)
+- **Git** - [Download](https://git-scm.com/downloads)
+- **Postman** atau **cURL** - untuk testing API
+
+## 🚀 Quick Start
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/Mhabib34/orderflow-go.git
+cd orderflow-go
+```
 
 ### 2. Setup PostgreSQL
 
 #### Windows
 
 ```bash
-# Download dan install PostgreSQL dari: https://www.postgresql.org/download/windows/
-
-# Setelah install, buat database untuk Order Service
+# Buka Command Prompt atau PowerShell sebagai Administrator
+# Masuk ke PostgreSQL
 psql -U postgres
+
+# Buat databases
 CREATE DATABASE order_service;
-\q
-
-# Buat database untuk Notification Service
-psql -U postgres
+CREATE DATABASE payment_service;
 CREATE DATABASE notification_service;
 \q
 
-# Buat database untuk Payment Service
-psql -U postgres
-CREATE DATABASE payment_service;
-\q
-
-# Import schema ke Order Service database
-psql -U postgres -d order_service -f database-schema.sql
-
-# Import schema ke Notification Service database
-psql -U postgres -d notification_service -f database-schema.sql
-
-# Import schema ke Notification Service database
-psql -U postgres -d payment_service -f database-schema.sql
+# Import schema (jika ada file schema)
+# psql -U postgres -d order_service -f order-service/schema.sql
+# psql -U postgres -d payment_service -f payment_service/schema.sql
+# psql -U postgres -d notification_service -f notification-service/schema.sql
 ```
 
 #### macOS
 
 ```bash
-# Install PostgreSQL menggunakan Homebrew
+# Install PostgreSQL (jika belum)
 brew install postgresql@15
-
-# Start PostgreSQL service
 brew services start postgresql@15
 
 # Buat databases
 createdb order_service
-createdb notification_service
 createdb payment_service
+createdb notification_service
 
-
-# Import schema
-psql -d order_service -f database-schema.sql
-psql -d notification_service -f database-schema.sql
-psql -d payment_service -f database-schema.sql
+# Import schema (jika ada)
+# psql -d order_service -f order-service/schema.sql
+# psql -d payment_service -f payment_service/schema.sql
+# psql -d notification_service -f notification-service/schema.sql
 ```
 
 #### Linux (Ubuntu/Debian)
@@ -81,19 +129,19 @@ psql -d payment_service -f database-schema.sql
 sudo apt update
 sudo apt install postgresql postgresql-contrib
 
-# Start PostgreSQL service
+# Start service
 sudo systemctl start postgresql
 sudo systemctl enable postgresql
 
 # Buat databases
 sudo -u postgres createdb order_service
-sudo -u postgres createdb notification_service
 sudo -u postgres createdb payment_service
+sudo -u postgres createdb notification_service
 
-# Import schema
-sudo -u postgres psql -d order_service -f database-schema.sql
-sudo -u postgres psql -d notification_service -f database-schema.sql
-sudo -u postgres psql -d payment_service -f database-schema.sql
+# Import schema (jika ada)
+# sudo -u postgres psql -d order_service -f order-service/schema.sql
+# sudo -u postgres psql -d payment_service -f payment_service/schema.sql
+# sudo -u postgres psql -d notification_service -f notification-service/schema.sql
 ```
 
 ### 3. Setup RabbitMQ
@@ -101,26 +149,22 @@ sudo -u postgres psql -d payment_service -f database-schema.sql
 #### Windows
 
 ```bash
-# Download dan install Erlang terlebih dahulu dari:
-# https://www.erlang.org/downloads
+# Download dan install Erlang dari: https://www.erlang.org/downloads
+# Download dan install RabbitMQ dari: https://www.rabbitmq.com/download.html
 
-# Download dan install RabbitMQ dari:
-# https://www.rabbitmq.com/download.html
-
-# Enable Management Plugin
+# Enable Management Plugin (Command Prompt as Administrator)
 rabbitmq-plugins enable rabbitmq_management
 
-# Start RabbitMQ
-# (Service akan start otomatis setelah install)
+# Service akan start otomatis
 ```
 
 #### macOS
 
 ```bash
-# Install RabbitMQ menggunakan Homebrew
+# Install RabbitMQ
 brew install rabbitmq
 
-# Start RabbitMQ service
+# Start service
 brew services start rabbitmq
 
 # Enable Management Plugin
@@ -131,10 +175,9 @@ rabbitmq-plugins enable rabbitmq_management
 
 ```bash
 # Install RabbitMQ
-sudo apt update
 sudo apt install rabbitmq-server
 
-# Start RabbitMQ service
+# Start service
 sudo systemctl start rabbitmq-server
 sudo systemctl enable rabbitmq-server
 
@@ -142,146 +185,55 @@ sudo systemctl enable rabbitmq-server
 sudo rabbitmq-plugins enable rabbitmq_management
 ```
 
-### 4. Verifikasi Installation
+### 4. Setup RabbitMQ Exchange & Queue
 
-**PostgreSQL:**
+Akses RabbitMQ Management UI di [http://localhost:15672](http://localhost:15672)
+- Username: `guest`
+- Password: `guest`
 
-```bash
-# Cek PostgreSQL berjalan
-psql -U postgres -l
+**Setup untuk Order Service:**
+1. **Create Exchange**: `order_exchanges` (type: `topic`, durable: `true`)
+2. **Create Queues**:
+   - `notification.order.created` (durable: `true`)
+   - `payment.order.created` (durable: `true`)
+3. **Create Bindings**:
+   - Exchange: `order_exchanges` → Queue: `notification.order.created`, Routing Key: `order.created`
+   - Exchange: `order_exchanges` → Queue: `payment.order.created`, Routing Key: `order.created`
 
-# Seharusnya melihat order_service dan notification_service dalam list
-```
+**Setup untuk Payment Service:**
+1. **Create Exchange**: `payment_exchanges` (type: `topic`, durable: `true`)
+2. **Create Queue**: `order.payment.status.updated` (durable: `true`)
+3. **Create Binding**:
+   - Exchange: `payment_exchanges` → Queue: `order.payment.status.updated`, Routing Key: `payment.status.updated`
 
-**RabbitMQ:**
+### 5. Setup Environment Variables
 
-```bash
-# Cek RabbitMQ berjalan
-sudo rabbitmqctl status
+Buat file `.env` di masing-masing service directory:
 
-# Akses Management UI
-# Buka browser: http://localhost:15672
-# Username: guest
-# Password: guest
-```
-
-### 5. Setup RabbitMQ Exchange & Queue
-
-**Via RabbitMQ Management UI (Recommended untuk pemula):**
-
-1. Buka http://localhost:15672
-2. Login dengan username: `guest`, password: `guest`
-3. Pergi ke tab **Exchanges**
-   - Click "Add a new exchange"
-   - Name: `order_exchanges`
-   - Type: `topic`
-   - Durability: `Durable`
-   - Click "Add exchange"
-4. Pergi ke tab **Queues**
-   - Click "Add a new queue"
-   - Name: `notification_queue`
-   - Durability: `Durable`
-   - Click "Add queue"
-5. Kembali ke tab **Exchanges**, click `order.events`
-   - Scroll ke bawah ke bagian "Bindings"
-   - To queue: `notification_queue`
-   - Routing key: `order.*`
-   - Click "Bind"
-
-**Via Command Line (Alternative):**
-
-```bash
-# Untuk Linux/macOS
-rabbitmqadmin declare exchange name=order.events type=topic durable=true
-rabbitmqadmin declare queue name=notification.queue durable=true
-rabbitmqadmin declare binding source=order.events destination=notification.queue routing_key="order.*"
-
-# Untuk Windows (gunakan rabbitmqadmin.bat jika sudah di-setup)
-# Atau lebih mudah pakai Management UI
-```
-
-## 🛠️ Development
-
-### Struktur Service yang Perlu Dibuat
-
-```
-order-service/
-├── internal/
-│   ├── routes/          # API routes
-│   ├── controllers/     # Business logic
-│   ├── models/          # Database models
-│   ├── usecase/        # Use Case layer'
-│   ├── repository/      # Repository layer
-│   └── broker/          # RabbitMQ producer
-├── .env
-
-notification-service/
-├── internal/
-│   ├── routes/          # API routes
-│   ├── controllers/     # Business logic
-│   ├── models/          # Database models
-│   ├── usecase/         # Use Case layer
-│   ├── repository/      # Repository layer
-│   └── consumers/       # RabbitMQ consumer
-├── .env
-
-payment-service/
-├── internal/
-│   ├── routes/          # API routes
-│   ├── controllers/     # Business logic
-│   ├── models/          # Database models
-│   ├── usecase/         # Use Case layer
-│   ├── repository/      # Repository layer
-│   └── broker/          # RabbitMQ consumer
-├── .env
-```
-
-### Environment Variables
-
-**Order Service (.env)**
-
+**order-service/.env**
 ```env
 PORT=8001
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=order_service
 DB_USER=postgres
-DB_PASSWORD=postgres
+DB_PASSWORD=your_postgres_password
 
 RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
-RABBITMQ_QUEUE=order.payment.status.updated
 RABBITMQ_EXCHANGE=order_exchanges
 ```
 
-**Notification Service (.env)**
-
+**payment_service/.env**
 ```env
-PORT=8002
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=notification_service
-DB_USER=postgres
-DB_PASSWORD=postgres
-
-RABBITMQ_HOST=localhost
-RABBITMQ_PORT=5672
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
-RABBITMQ_QUEUE=notification.order.created
-```
-
-**Payment Service (.env)**
-
-```env
-PORT=8002
+PORT=8003
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=payment_service
 DB_USER=postgres
-DB_PASSWORD=postgres
+DB_PASSWORD=your_postgres_password
 
 RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
@@ -291,310 +243,440 @@ RABBITMQ_QUEUE=payment.order.created
 RABBITMQ_EXCHANGE=payment_exchanges
 ```
 
-**Note:**
+**notification-service/.env**
+```env
+PORT=8002
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=notification_service
+DB_USER=postgres
+DB_PASSWORD=your_postgres_password
 
-- Sesuaikan `DB_PASSWORD` dengan password PostgreSQL yang kamu set saat instalasi
-- Default PostgreSQL port adalah 5432 untuk kedua database (berbeda database name)
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_QUEUE=notification.order.created
+```
+
+### 6. Install Dependencies & Run Services
+
+```bash
+# Terminal 1 - Order Service
+cd order-service
+go mod download
+go run main.go
+
+# Terminal 2 - Payment Service
+cd payment_service
+go mod download
+go run main.go
+
+# Terminal 3 - Notification Service
+cd notification-service
+go mod download
+go run main.go
+```
+
+## 🔍 Service Details
+
+### Order Service
+
+**Struktur:**
+```
+order-service/
+├── internal/
+│   ├── controllers/    # HTTP handlers
+│   ├── models/         # Data models
+│   ├── repository/     # Database layer
+│   ├── usecase/        # Business logic
+│   ├── routes/         # API routes
+│   └── broker/         # RabbitMQ publisher
+├── main.go
+├── .env
+└── go.mod
+```
+
+**Responsibilities:**
+- Menerima request pembuatan order
+- Menyimpan order ke database
+- Publish event `order.created` ke RabbitMQ
+- Update status order berdasarkan payment status
+- Menyediakan API untuk query orders
+
+### Payment Service
+
+**Struktur:**
+```
+payment_service/
+├── internal/
+│   ├── controllers/    # HTTP handlers
+│   ├── models/         # Data models
+│   ├── repository/     # Database layer
+│   ├── usecase/        # Business logic
+│   ├── routes/         # API routes
+│   ├── broker/         # RabbitMQ publisher
+│   └── consumers/      # RabbitMQ consumer
+├── main.go
+├── .env
+└── go.mod
+```
+
+**Responsibilities:**
+- Consume event `order.created` dari RabbitMQ
+- Proses pembayaran (simulasi)
+- Update payment status
+- Publish event `payment.status.updated` ke RabbitMQ
+
+### Notification Service
+
+**Struktur:**
+```
+notification-service/
+├── internal/
+│   ├── controllers/    # HTTP handlers
+│   ├── models/         # Data models
+│   ├── repository/     # Database layer
+│   ├── usecase/        # Business logic
+│   ├── routes/         # API routes
+│   └── consumers/      # RabbitMQ consumer
+├── main.go
+├── .env
+└── go.mod
+```
+
+**Responsibilities:**
+- Consume events dari RabbitMQ
+- Membuat notifikasi untuk user
+- Menyimpan notifikasi ke database
+- Menyediakan API untuk query notifications
 
 ## 📖 API Documentation
 
 ### Order Service API
 
-Base URL: `http://localhost:3000/api/v1`
+**Base URL:** `http://localhost:8001/api/v1`
 
-**Endpoints:**
+#### Create Order
+```bash
+POST /orders
+Content-Type: application/json
 
-- `POST /orders` - Membuat order baru
-- `GET /orders` - Mendapatkan daftar orders
-- `GET /orders/{orderId}` - Mendapatkan detail order
-- `PATCH /orders/{orderId}` - Update status order
+{
+  "total_amount": 150000.00
+}
+```
 
-Lihat detail lengkap di `order-service-api.yaml`
+**Response:**
+```json
+{
+  "id": "uuid",
+  "total_amount": 150000.00,
+  "status": "pending",
+  "created_at": "2024-01-21T10:00:00Z"
+}
+```
+
+#### Get All Orders
+```bash
+GET /orders
+```
+
+#### Get Order by ID
+```bash
+GET /orders/{orderId}
+```
+
+#### Update Order Status
+```bash
+PATCH /orders/{orderId}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+```
+
+### Payment Service API
+
+**Base URL:** `http://localhost:8003/api/v1`
+
+#### Get Payment by Order ID
+```bash
+GET /payments/order/{orderId}
+```
+
+#### Get All Payments
+```bash
+GET /payments
+```
 
 ### Notification Service API
 
-Base URL: `http://localhost:8000/api/v1`
+**Base URL:** `http://localhost:8002/api/v1`
 
-**Endpoints:**
-
-- `GET /notifications` - Mendapatkan daftar notifications
-- `GET /notifications/{notificationId}` - Mendapatkan detail notification
-- `PATCH /notifications/{notificationId}` - Mark notification as read
-
-Lihat detail lengkap di `notification-service-api.yaml`
-
-## 🧪 Testing Flow
-
-### 1. Create Order
-
+#### Get All Notifications
 ```bash
-curl -X POST http://localhost:3000/api/v1/orders \
+GET /notifications
+```
+
+#### Get Notification by ID
+```bash
+GET /notifications/{notificationId}
+```
+
+#### Mark as Read
+```bash
+PATCH /notifications/{notificationId}
+```
+
+## 🧪 Testing
+
+### End-to-End Flow
+
+1. **Create Order**
+```bash
+curl -X POST http://localhost:8001/api/v1/orders \
   -H "Content-Type: application/json" \
   -d '{"total_amount": 150000.00}'
 ```
 
-**Expected:**
+**Expected Results:**
+- Order created in `order_service` database
+- Event published to `order_exchanges`
+- Payment created in `payment_service` database
+- Notification created in `notification_service` database
 
-- Order created in order_service_db
-- Event published to RabbitMQ
-- Notification created in notification_service_db
-
-### 2. Check Notifications
-
+2. **Check Payment**
 ```bash
-curl http://localhost:3000/api/v1/notifications
+curl http://localhost:8003/api/v1/payments
 ```
 
-### 3. Update Order Status
-
+3. **Check Notifications**
 ```bash
-curl -X PATCH http://localhost:3000/api/v1/orders/{orderId} \
-  -H "Content-Type: application/json" \
-  -d '{"status": "completed"}'
+curl http://localhost:8002/api/v1/notifications
 ```
 
-**Expected:**
+4. **Verify in RabbitMQ**
+- Open [http://localhost:15672](http://localhost:15672)
+- Check queues for message counts
+- Monitor message rates
 
-- Order status updated in order_service_db
-- Event published to RabbitMQ
-- New notification created in notification_service_db
-
-### 4. Mark Notification as Read
+### Unit Testing
 
 ```bash
-curl -X PATCH http://localhost:3000/api/v1/notifications/{notificationId}
+# Run tests for each service
+cd order-service
+go test ./... -v
+
+cd ../payment_service
+go test ./... -v
+
+cd ../notification-service
+go test ./... -v
 ```
 
 ## 📊 Monitoring
 
 ### RabbitMQ Management UI
 
-- URL: http://localhost:15672
-- Username: `guest` / Password: `guest`
-- Monitor queues, exchanges, dan message flow
-- Lihat message rate dan throughput
-- Check connections dari services
+- **URL:** [http://localhost:15672](http://localhost:15672)
+- **Credentials:** guest / guest
+- **Features:**
+  - Monitor queue depth
+  - Check message rates
+  - View active connections
+  - Inspect exchanges and bindings
 
-### PostgreSQL Database
+### PostgreSQL Monitoring
 
-Gunakan tools seperti:
+**Tools yang direkomendasikan:**
+- [pgAdmin](https://www.pgadmin.org/) - Full-featured GUI
+- [DBeaver](https://dbeaver.io/) - Universal database tool
+- [TablePlus](https://tableplus.com/) - Modern database GUI
 
-- **pgAdmin** - GUI tool yang powerful
-- **DBeaver** - Universal database tool
-- **psql CLI** - Command line interface
-- **TablePlus** - Modern database GUI
-
-Contoh koneksi untuk Order Service:
-
+**Connection Details:**
 ```
 Host: localhost
 Port: 5432
-Database: order_service_db
+Databases: order_service, payment_service, notification_service
 Username: postgres
 Password: [your_password]
 ```
 
 ### Application Logs
 
-Monitor console output dari masing-masing service untuk:
-
-- Request/Response logs
+Monitor console output dari setiap service untuk:
+- HTTP request/response logs
+- Database query logs
 - RabbitMQ connection status
-- Database queries
-- Error messages
+- Error messages dan stack traces
 
 ## 🔧 Troubleshooting
 
 ### PostgreSQL Issues
 
-**Problem: Cannot connect to PostgreSQL**
-
+**Problem: Cannot connect to database**
 ```bash
-# Check jika PostgreSQL service berjalan
-# Windows
-services.msc (cari PostgreSQL)
+# Check PostgreSQL status
+# Windows: services.msc → Look for PostgreSQL
+# macOS: brew services list | grep postgresql
+# Linux: sudo systemctl status postgresql
 
-# macOS
-brew services list | grep postgresql
+# Restart if needed
+# Windows: Restart via services.msc
+# macOS: brew services restart postgresql@15
+# Linux: sudo systemctl restart postgresql
+```
 
-# Linux
-sudo systemctl status postgresql
+**Problem: Database doesn't exist**
+```bash
+# List databases
+psql -U postgres -l
+
+# Create if missing
+createdb order_service
+createdb payment_service
+createdb notification_service
 ```
 
 **Problem: Password authentication failed**
-
-- Pastikan password yang digunakan benar
-- Cek file `pg_hba.conf` untuk authentication method
-- Restart PostgreSQL service setelah perubahan
-
-**Problem: Database not found**
-
-```bash
-# List semua databases
-psql -U postgres -l
-
-# Buat database jika belum ada
-createdb order_service_db
-createdb notification_service_db
-```
+- Verify password in `.env` files
+- Check `pg_hba.conf` for authentication method
+- Reset password: `ALTER USER postgres PASSWORD 'new_password';`
 
 ### RabbitMQ Issues
 
 **Problem: Cannot connect to RabbitMQ**
-
 ```bash
-# Check jika RabbitMQ service berjalan
-# Windows
-services.msc (cari RabbitMQ)
+# Check RabbitMQ status
+# Windows: services.msc → Look for RabbitMQ
+# macOS: brew services list | grep rabbitmq
+# Linux: sudo systemctl status rabbitmq-server
 
-# macOS
-brew services list | grep rabbitmq
-
-# Linux
-sudo systemctl status rabbitmq-server
-```
-
-**Problem: Management UI tidak bisa diakses**
-
-```bash
-# Enable management plugin
-rabbitmq-plugins enable rabbitmq_management
-
-# Restart RabbitMQ service
-# Windows: restart via services.msc
+# Restart if needed
+# Windows: Restart via services.msc
 # macOS: brew services restart rabbitmq
 # Linux: sudo systemctl restart rabbitmq-server
 ```
 
-**Problem: Exchange/Queue tidak ada**
-
-- Login ke Management UI (http://localhost:15672)
-- Buat manual sesuai langkah di section "Setup RabbitMQ Exchange & Queue"
-
-### Service Development Issues
-
-**Problem: Port already in use**
-
+**Problem: Management UI not accessible**
 ```bash
-# Check process menggunakan port
-# Windows
-netstat -ano | findstr :3000
+# Enable management plugin
+rabbitmq-plugins enable rabbitmq_management
 
-# macOS/Linux
-lsof -i :3000
-
-# Kill process jika perlu atau ganti PORT di .env
+# Restart RabbitMQ after enabling
 ```
 
-**Problem: Cannot connect to database dari service**
+**Problem: Messages not being consumed**
+- Verify consumer is running (check service logs)
+- Check queue bindings in Management UI
+- Verify routing keys match
+- Check for errors in consumer service logs
 
-- Pastikan PostgreSQL berjalan
-- Cek connection string di .env file
-- Test connection manual menggunakan psql
-- Pastikan firewall tidak block koneksi
+### Application Issues
 
-**Problem: Message tidak diterima di Notification Service**
+**Problem: Port already in use**
+```bash
+# Find process using port
+# Windows: netstat -ano | findstr :8001
+# macOS/Linux: lsof -i :8001
 
-- Cek RabbitMQ Management UI, apakah message masuk ke queue?
-- Verifikasi binding antara exchange dan queue
-- Cek routing key sesuai dengan yang di-publish
-- Pastikan consumer service berjalan
+# Change PORT in .env or kill the process
+```
+
+**Problem: Go module issues**
+```bash
+# Clean module cache
+go clean -modcache
+
+# Re-download dependencies
+go mod download
+go mod tidy
+```
 
 ## 🎯 Learning Objectives
 
-Dari project ini kamu akan belajar:
+Project ini dirancang untuk mempelajari:
 
-1. ✅ **Microservice Architecture**
-   - Service independence
-   - Database per service pattern
-   - API design
+### 1. Microservice Architecture ✅
+- Service independence dan isolation
+- Database per service pattern
+- Service communication patterns
+- API design dan versioning
 
-2. ✅ **Message Broker**
-   - Asynchronous communication
-   - Event-driven architecture
-   - Publisher/Subscriber pattern
-   - RabbitMQ setup dan configuration
+### 2. Event-Driven Architecture ✅
+- Asynchronous communication
+- Event publishing dan consuming
+- Message broker integration
+- Event-driven workflows
 
-3. ✅ **Database Design**
-   - Schema design
-   - Indexing
-   - Triggers
-   - Multi-database management
+### 3. Message Broker (RabbitMQ) ✅
+- Exchange types (topic, direct, fanout)
+- Queue management
+- Routing keys dan bindings
+- Publisher/Consumer pattern
+- Message durability
 
-4. ✅ **Local Development Environment**
-   - PostgreSQL installation dan configuration
-   - RabbitMQ setup
-   - Service orchestration tanpa containerization
+### 4. Clean Architecture ✅
+- Separation of concerns
+- Dependency injection
+- Repository pattern
+- Use case layer
+- Controller/Handler layer
 
-## 🔄 Next Steps
+### 5. Database Design ✅
+- Schema design
+- Relationships
+- Indexing strategies
+- Database migrations
 
-Setelah basic implementation, kamu bisa tambahkan:
-
-1. **Containerization (Recommended next step!)**
-   - Dockerize Order Service
-   - Dockerize Notification Service
-   - Docker Compose orchestration
-   - Multi-stage builds
-
-2. **Error Handling & Retry**
-   - Dead letter queue
-   - Retry mechanism
-   - Circuit breaker
-
-3. **Authentication & Authorization**
-   - JWT tokens
-   - API Gateway
-
-4. **Logging & Monitoring**
-   - Centralized logging (ELK stack)
-   - Metrics (Prometheus + Grafana)
-   - Distributed tracing (Jaeger)
-
-5. **Additional Services**
-   - Payment Service
-   - Email Service
-   - User Service
-
-6. **Advanced Features**
-   - CQRS pattern
-   - Event sourcing
-   - Saga pattern
+### 6. Go Best Practices ✅
+- Project structure
+- Error handling
+- Environment configuration
+- Dependency management
 
 ## 📚 Resources
 
-### Installation Guides
-
-- [PostgreSQL Download & Installation](https://www.postgresql.org/download/)
-- [RabbitMQ Installation Guide](https://www.rabbitmq.com/download.html)
-- [Erlang Download (required for RabbitMQ)](https://www.erlang.org/downloads)
-
-### Learning Resources
-
-- [RabbitMQ Tutorials](https://www.rabbitmq.com/getstarted.html)
-- [RabbitMQ Management Plugin](https://www.rabbitmq.com/management.html)
+### Documentation
+- [Go Documentation](https://go.dev/doc/)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [RabbitMQ Tutorials](https://www.rabbitmq.com/getstarted.html)
 - [Microservices Patterns](https://microservices.io/patterns/)
-- [Event-Driven Architecture](https://martinfowler.com/articles/201701-event-driven.html)
+
+### Learning Materials
+- [Event-Driven Architecture by Martin Fowler](https://martinfowler.com/articles/201701-event-driven.html)
+- [Clean Architecture by Uncle Bob](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- [RabbitMQ Best Practices](https://www.rabbitmq.com/production-checklist.html)
 
 ### Tools
-
-- [Postman](https://www.postman.com/downloads/) - API testing
-- [pgAdmin](https://www.pgadmin.org/download/) - PostgreSQL GUI
-- [DBeaver](https://dbeaver.io/download/) - Universal database tool
-- [TablePlus](https://tableplus.com/) - Modern database GUI
+- [Postman](https://www.postman.com/) - API testing
+- [pgAdmin](https://www.pgadmin.org/) - PostgreSQL GUI
+- [DBeaver](https://dbeaver.io/) - Database tool
+- [Docker](https://www.docker.com/) - Containerization
 
 ## 🤝 Contributing
 
-Ini adalah project pembelajaran, feel free untuk:
+Contributions are welcome! Ini adalah project pembelajaran, silakan:
 
-- Menambahkan fitur baru
-- Memperbaiki bugs
-- Menambahkan dokumentasi
+1. Fork repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
 
 ## 📝 License
 
-MIT License - silakan digunakan untuk belajar dan eksperimen!
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 👨‍💻 Author
+
+**Mhabib34**
+- GitHub: [@Mhabib34](https://github.com/Mhabib34)
 
 ---
 
 **Happy Learning! 🚀**
+
+*If you find this project helpful, please give it a ⭐*
