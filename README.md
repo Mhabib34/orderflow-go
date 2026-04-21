@@ -4,7 +4,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-316192?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8+-FF6600?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
 
-A beginner-friendly project for learning **microservice architecture** and **message brokers** using Go, PostgreSQL, and RabbitMQ. This project implements an Order Management System built on an event-driven architecture.
+A project for learning **microservice architecture** and **message brokers** using Go, PostgreSQL, and RabbitMQ. This project implements an Order Management System built on an event-driven architecture.
 
 ## 📚 Table of Contents
 
